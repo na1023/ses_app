@@ -231,8 +231,9 @@ with tab_chart:
                         line=dict(color=PAPER_BG, width=2)),
             textfont=dict(color="#e2e8f0", size=11),
         ))
-        fig2.update_layout(**base_layout("勤怠区分の内訳（全期間）"),
-                           height=300, margin=dict(l=0, r=0, t=40, b=0))
+        _lo2 = base_layout("勤怠区分の内訳（全期間）")
+        _lo2.update(height=300, margin=dict(l=0, r=0, t=40, b=0))
+        fig2.update_layout(**_lo2)
         st.plotly_chart(fig2, use_container_width=True)
 
     # ---- 3. 会社別稼働時間（横棒） ----

@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_manager import (
     load, save, backup_data, init_all,
     DATA_DIR, BACKUP_DIR, PATHS, SCHEMAS,
+    _use_supabase,
 )
 from utils.styles import THEME_CSS, render_sidebar
 
@@ -35,6 +36,18 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ================================================================
+# Supabase 接続状態
+# ================================================================
+if _use_supabase():
+    st.success("Supabase に接続済みです。データはクラウドに自動保存されます。")
+else:
+    st.warning(
+        "現在ローカル CSV モードで動作中です。"
+        "Streamlit Cloud では再起動するとデータが消えます。  \n"
+        "永続化するには Supabase を設定してください（下の「Supabase 設定手順」タブを参照）。"
+    )
+
 KEY_LABELS = {
     "projects":   "案件マスタ",
     "interviews": "面談データ",
@@ -42,8 +55,8 @@ KEY_LABELS = {
     "daily":      "日報データ",
 }
 
-tab_export, tab_import, tab_backup, tab_reset = st.tabs(
-    ["エクスポート", "インポート", "バックアップ", "データリセット"]
+tab_export, tab_import, tab_backup, tab_reset, tab_supabase = st.tabs(
+    ["エクスポート", "インポート", "バックアップ", "データリセット", "Supabase 設定手順"]
 )
 
 # ================================================================
@@ -202,3 +215,67 @@ with tab_reset:
             save(target_reset, df_empty)
             st.success(f"{KEY_LABELS[target_reset]} を初期化しました。")
             st.rerun()
+
+# ================================================================
+# Supabase 設定手順タブ
+# ================================================================
+with tab_supabase:
+    st.markdown("#### Supabase でデータを永続化する手順")
+    st.markdown("""
+**ステップ 1 — Supabase のプロジェクトを作成する**
+1. [supabase.com](https://supabase.com) にアクセスしてアカウント作成（無料）
+2. 「New Project」でプロジェクトを作成する（リージョン: `Northeast Asia (Tokyo)` 推奨）
+
+**ステップ 2 — テーブルを作成する**
+1. 左メニューの「SQL Editor」を開く
+2. プロジェクト内の `supabase_setup.sql` の内容をコピーして貼り付け、「Run」を実行
+
+**ステップ 3 — API キーを取得する**
+1. 左メニューの「Settings > API」を開く
+2. `Project URL` と `anon public` キーをコピーする
+
+**ステップ 4 — Streamlit Cloud にキーを登録する**
+1. Streamlit Cloud のアプリページを開き、右上の「︙」→「Settings」→「Secrets」を開く
+2. 以下の内容を貼り付けて保存する
+
+```toml
+SUPABASE_URL = "https://xxxxxxxxxxxx.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6..."
+```
+
+3. アプリを再起動するとクラウドDBに接続され、以後データは永続保存される
+
+**ステップ 5 — 既存データを移行する（オプション）**
+設定後に下のボタンでローカル CSV のデータを Supabase へ一括移行できます。
+""")
+
+    if _use_supabase():
+        st.success("Supabase は接続済みです。")
+        st.markdown("#### ローカル CSV → Supabase へ一括移行")
+        st.caption("CSV ファイルに残っているデータを Supabase へコピーします（既存データと重複IDは除外）。")
+        if st.button("CSV データを Supabase へ移行する", key="migrate_to_supabase"):
+            total = 0
+            for key, label in KEY_LABELS.items():
+                try:
+                    df_csv = pd.read_csv(PATHS[key], dtype=str, encoding="utf-8-sig").fillna("")
+                    if not df_csv.empty:
+                        df_cloud = load(key)
+                        existing_ids = set(df_cloud["id"].tolist()) if not df_cloud.empty else set()
+                        df_new = df_csv[~df_csv["id"].isin(existing_ids)]
+                        if not df_new.empty:
+                            from utils.data_manager import _get_supabase, _TABLE_MAP
+                            client = _get_supabase()
+                            records = df_new.fillna("").to_dict("records")
+                            client.table(_TABLE_MAP[key]).upsert(records).execute()
+                            st.write(f"{label}: {len(df_new)} 件を移行")
+                            total += len(df_new)
+                except FileNotFoundError:
+                    pass
+                except Exception as e:
+                    st.warning(f"{label} の移行中にエラー: {e}")
+            if total:
+                st.success(f"合計 {total} 件を移行しました。")
+            else:
+                st.info("移行すべき新規データがありませんでした。")
+    else:
+        st.info("Supabase に接続するとここで移行ツールが利用できます。")

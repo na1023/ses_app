@@ -1,6 +1,7 @@
 """
 utils/data_manager.py
 データの読み書き・バックアップ・初期化を管理するモジュール
+Supabase が設定されている場合はクラウドDBを使用（再起動後もデータが保持される）
 """
 
 import os
@@ -12,6 +13,14 @@ from datetime import datetime
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 BACKUP_DIR = os.path.join(BASE_DIR, "backup")
+
+# Supabase テーブル名マッピング
+_TABLE_MAP = {
+    "projects":   "projects",
+    "interviews": "interviews",
+    "todos":      "todos",
+    "daily":      "daily_reports",
+}
 
 PATHS = {
     "projects":   os.path.join(DATA_DIR, "projects.csv"),
@@ -53,35 +62,64 @@ SCHEMAS = {
 }
 
 
+# ================================================================
+# Supabase 接続
+# ================================================================
+
+def _use_supabase() -> bool:
+    """Supabase の接続情報が st.secrets に設定されているか確認する"""
+    try:
+        import streamlit as st
+        return bool(
+            st.secrets.get("SUPABASE_URL") and st.secrets.get("SUPABASE_KEY")
+        )
+    except Exception:
+        return False
+
+
+def _get_supabase():
+    """Supabase クライアントを返す（セッション内でキャッシュ）"""
+    import streamlit as st
+    from supabase import create_client
+
+    if "_supabase_client" not in st.session_state:
+        st.session_state["_supabase_client"] = create_client(
+            st.secrets["SUPABASE_URL"],
+            st.secrets["SUPABASE_KEY"],
+        )
+    return st.session_state["_supabase_client"]
+
+
+# ================================================================
+# ローカル CSV ヘルパー
+# ================================================================
+
 def ensure_data_dirs():
-    """data/ と backup/ ディレクトリを確保する"""
     os.makedirs(DATA_DIR, exist_ok=True)
     os.makedirs(BACKUP_DIR, exist_ok=True)
 
 
 def init_csv(key: str) -> None:
-    """CSVが存在しなければ空のファイルを作成する"""
     path = PATHS[key]
     if not os.path.exists(path):
+        ensure_data_dirs()
         df = pd.DataFrame(columns=SCHEMAS[key]["columns"])
         df.to_csv(path, index=False, encoding="utf-8-sig")
 
 
 def init_all():
-    """全CSVを初期化（存在しない場合のみ）"""
+    """全データソースを初期化（存在しない場合のみ）"""
     ensure_data_dirs()
     for key in PATHS:
         init_csv(key)
 
 
-def load(key: str) -> pd.DataFrame:
-    """CSVを読み込んで DataFrame を返す"""
+def _load_csv(key: str) -> pd.DataFrame:
     path = PATHS[key]
     if not os.path.exists(path):
         init_csv(key)
     try:
         df = pd.read_csv(path, dtype=str, encoding="utf-8-sig")
-        # 不足カラムを補完
         for col in SCHEMAS[key]["columns"]:
             if col not in df.columns:
                 df[col] = ""
@@ -90,18 +128,79 @@ def load(key: str) -> pd.DataFrame:
         return pd.DataFrame(columns=SCHEMAS[key]["columns"])
 
 
-def save(key: str, df: pd.DataFrame) -> None:
-    """DataFrame を CSV に上書き保存する"""
+def _save_csv(key: str, df: pd.DataFrame) -> None:
     ensure_data_dirs()
     df.to_csv(PATHS[key], index=False, encoding="utf-8-sig")
 
 
+# ================================================================
+# 公開 API
+# ================================================================
+
+def load(key: str) -> pd.DataFrame:
+    """データを読み込んで DataFrame を返す"""
+    cols = SCHEMAS[key]["columns"]
+
+    if _use_supabase():
+        try:
+            client = _get_supabase()
+            table  = _TABLE_MAP[key]
+            resp   = client.table(table).select("*").execute()
+            if resp.data:
+                df = pd.DataFrame(resp.data)
+                for col in cols:
+                    if col not in df.columns:
+                        df[col] = ""
+                return df[cols].fillna("")
+            return pd.DataFrame(columns=cols)
+        except Exception as e:
+            import streamlit as st
+            st.warning(f"Supabase 読み込みエラー（ローカルで代替）: {e}")
+
+    return _load_csv(key)
+
+
+def save(key: str, df: pd.DataFrame) -> None:
+    """DataFrame を保存する"""
+    if _use_supabase():
+        try:
+            client  = _get_supabase()
+            table   = _TABLE_MAP[key]
+            records = df.fillna("").to_dict("records")
+
+            # 削除されたレコードを消す
+            existing = client.table(table).select("id").execute()
+            existing_ids = {r["id"] for r in (existing.data or [])}
+            new_ids = {str(r["id"]) for r in records}
+            for did in existing_ids - new_ids:
+                client.table(table).delete().eq("id", did).execute()
+
+            # 残りを upsert
+            if records:
+                client.table(table).upsert(records).execute()
+            return
+        except Exception as e:
+            import streamlit as st
+            st.warning(f"Supabase 保存エラー（ローカルに保存）: {e}")
+
+    _save_csv(key, df)
+
+
 def append_row(key: str, row: dict) -> None:
-    """1行を CSV に追記する"""
-    df = load(key)
-    new_row = pd.DataFrame([row])
-    df = pd.concat([df, new_row], ignore_index=True)
-    save(key, df)
+    """1行を追加する"""
+    if _use_supabase():
+        try:
+            client = _get_supabase()
+            table  = _TABLE_MAP[key]
+            client.table(table).insert(row).execute()
+            return
+        except Exception as e:
+            import streamlit as st
+            st.warning(f"Supabase 追加エラー（ローカルに追記）: {e}")
+
+    df = _load_csv(key)
+    df = pd.concat([df, pd.DataFrame([row])], ignore_index=True)
+    _save_csv(key, df)
 
 
 def generate_id() -> str:
@@ -110,7 +209,9 @@ def generate_id() -> str:
 
 
 def backup_data():
-    """data/ 配下を backup/YYYYMMDD_HHMMSS/ にコピーする"""
+    """data/ 配下を backup/YYYYMMDD_HHMMSS/ にコピーする（CSV モードのみ）"""
+    if _use_supabase():
+        return None
     ensure_data_dirs()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     dest = os.path.join(BACKUP_DIR, timestamp)
@@ -121,7 +222,6 @@ def backup_data():
 
 
 def get_project_options() -> list[dict]:
-    """案件プルダウン用に (会社名, 案件名) のリストを返す"""
     df = load("projects")
     if df.empty:
         return []
