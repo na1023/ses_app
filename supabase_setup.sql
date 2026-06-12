@@ -1,59 +1,59 @@
--- ============================================================
--- SES業務管理アプリ  Supabase テーブル作成スクリプト
--- supabase.com の SQL Editor に貼り付けて実行してください
--- ============================================================
+  -- ============================================================
+  -- SES業務管理アプリ  Supabase テーブル作成スクリプト
+  -- supabase.com の SQL Editor に貼り付けて実行してください
+  -- ============================================================
 
--- 案件
-create table if not exists projects (
-  id           text primary key,
-  company      text default '',
-  project_name text default '',
-  start_date   text default '',
-  end_date     text default '',
-  memo         text default ''
-);
+  -- 案件
+  create table if not exists projects (
+    id           text primary key,
+    company      text default '',
+    project_name text default '',
+    start_date   text default '',
+    end_date     text default '',
+    memo         text default ''
+  );
 
--- 面談
-create table if not exists interviews (
-  id                  text primary key,
-  company             text default '',
-  project_name        text default '',
-  work_content        text default '',
-  attendance_content  text default '',
-  status              text default '',
-  interview_date      text default '',
-  memo                text default ''
-);
+  -- 面談
+  create table if not exists interviews (
+    id                  text primary key,
+    company             text default '',
+    project_name        text default '',
+    work_content        text default '',
+    attendance_content  text default '',
+    status              text default '',
+    interview_date      text default '',
+    memo                text default ''
+  );
 
--- ToDo
-create table if not exists todos (
-  id           text primary key,
-  company      text default '',
-  project_name text default '',
-  task         text default '',
-  due_date     text default '',
-  progress     text default '',
-  created_at   text default ''
-);
+  -- ToDo
+  create table if not exists todos (
+    id           text primary key,
+    company      text default '',
+    project_name text default '',
+    task         text default '',
+    due_date     text default '',
+    progress     text default '',
+    created_at   text default ''
+  );
 
--- 日報
-create table if not exists daily_reports (
-  id              text primary key,
-  date            text default '',
-  company         text default '',
-  project_name    text default '',
-  attendance_type text default '',
-  start_time      text default '',
-  end_time        text default '',
-  break_time      text default '',
-  work_hours      float8 default 0,
-  work_content    text default '',
-  remarks         text default '',
-  created_at      text default ''
-);
+  -- 日報
+  create table if not exists daily_reports (
+    id              text primary key,
+    date            text default '',
+    company         text default '',
+    project_name    text default '',
+    attendance_type text default '',
+    start_time      text default '',
+    end_time        text default '',
+    break_time      text default '',
+    work_hours      float8 default 0,
+    work_content    text default '',
+    remarks         text default '',
+    created_at      text default ''
+  );
 
--- Row Level Security を無効化（個人利用のため）
-alter table projects      disable row level security;
-alter table interviews    disable row level security;
-alter table todos         disable row level security;
-alter table daily_reports disable row level security;
+  -- Row Level Security を無効化（個人利用のため）
+  alter table projects      disable row level security;
+  alter table interviews    disable row level security;
+  alter table todos         disable row level security;
+  alter table daily_reports disable row level security;
