@@ -173,6 +173,9 @@ div[data-testid="stMetricValue"] {
 """
 
 
+APP_VERSION = "1.2.0"
+
+
 def render_sidebar() -> None:
     """全ページ共通のサイドバーナビゲーションを描画する"""
     import streamlit as st
@@ -180,9 +183,15 @@ def render_sidebar() -> None:
 
     with st.sidebar:
         st.markdown("## SES業務管理")
+        st.markdown(
+            f"<div style='font-size:0.72rem; color:#475569; margin-top:-0.5rem; "
+            f"margin-bottom:0.75rem; padding-left:0.1rem;'>ver {APP_VERSION}</div>",
+            unsafe_allow_html=True,
+        )
         st.markdown("---")
         st.markdown(
-            "<div style='font-size:0.78rem; color:#64748b; padding: 0 0.5rem;'>ナビゲーション</div>",
+            "<div style='font-size:0.75rem; color:#64748b; padding: 0 0.25rem; "
+            "margin-bottom:0.25rem;'>ナビゲーション</div>",
             unsafe_allow_html=True,
         )
         st.page_link("app.py",                    label="ダッシュボード")
