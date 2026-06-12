@@ -151,7 +151,7 @@ def load(key: str) -> pd.DataFrame:
                 for col in cols:
                     if col not in df.columns:
                         df[col] = ""
-                return df[cols].fillna("")
+                return df[cols].fillna("").astype(str)
             return pd.DataFrame(columns=cols)
         except Exception as e:
             import streamlit as st
