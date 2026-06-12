@@ -354,12 +354,16 @@ for _, row in df_view.iterrows():
                 new_wh = calc_work_hours(e_s, e_e, e_b)
                 df_all = load("daily")
                 m = df_all["id"] == rid
-                df_all.loc[m, ["date","company","project_name","attendance_type",
-                               "start_time","end_time","break_time","work_hours",
-                               "work_content","remarks"]] = [
-                    new_date, edit_company, edit_project, new_att,
-                    e_s, e_e, e_b, round(new_wh, 2), new_content, new_remarks
-                ]
+                df_all.loc[m, "date"]            = new_date
+                df_all.loc[m, "company"]         = edit_company
+                df_all.loc[m, "project_name"]    = edit_project
+                df_all.loc[m, "attendance_type"] = new_att
+                df_all.loc[m, "start_time"]      = e_s
+                df_all.loc[m, "end_time"]        = e_e
+                df_all.loc[m, "break_time"]      = e_b
+                df_all.loc[m, "work_hours"]      = str(round(new_wh, 2))
+                df_all.loc[m, "work_content"]    = new_content
+                df_all.loc[m, "remarks"]         = new_remarks
                 save("daily", df_all)
                 st.session_state[edit_key] = False
                 st.success("更新しました。")
