@@ -1,10 +1,12 @@
 """
 pages/4_レポート.py
-日報データを基に週報・月報を自動生成し、グラフで可視化するページ
+日報データを基に週報・月報を自動生成し、Plotlyグラフで可視化するページ
 """
 
 import streamlit as st
 import pandas as pd
+import plotly.graph_objects as go
+import plotly.express as px
 from datetime import datetime, date, timedelta
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,19 +33,48 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
+# ===== Plotly 共通テーマ =====
+PLOT_BG    = "#0f1117"
+PAPER_BG   = "#161b27"
+GRID_COLOR = "#1e2a3a"
+TEXT_COLOR = "#94a3b8"
+ACCENT     = "#3b82f6"
+PALETTE    = ["#3b82f6","#6366f1","#8b5cf6","#10b981","#f59e0b","#f97316","#ef4444","#64748b"]
+
+def base_layout(title: str = "") -> dict:
+    return dict(
+        title=dict(text=title, font=dict(color="#e2e8f0", size=14), x=0),
+        paper_bgcolor=PAPER_BG,
+        plot_bgcolor=PLOT_BG,
+        font=dict(color=TEXT_COLOR, size=12),
+        margin=dict(l=16, r=16, t=40 if title else 16, b=40),
+        xaxis=dict(gridcolor=GRID_COLOR, linecolor=GRID_COLOR, tickcolor=GRID_COLOR),
+        yaxis=dict(gridcolor=GRID_COLOR, linecolor=GRID_COLOR, tickcolor=GRID_COLOR),
+        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color=TEXT_COLOR)),
+    )
+
+# ===== データ読み込み =====
 df_raw = load("daily")
 
 if df_raw.empty:
     st.info("日報データがありません。先に日報を登録してください。")
     st.stop()
 
-# 型変換
 df_raw["date"]       = pd.to_datetime(df_raw["date"], errors="coerce")
 df_raw["work_hours"] = pd.to_numeric(df_raw["work_hours"], errors="coerce").fillna(0)
 df_raw = df_raw.dropna(subset=["date"])
 df_raw["year_month"] = df_raw["date"].dt.strftime("%Y-%m")
 df_raw["year_week"]  = df_raw["date"].dt.strftime("%Y-W%U")
-df_raw["weekday"]    = df_raw["date"].dt.day_name()
+
+# 今月まで全月リスト生成
+today = date.today()
+min_ym = df_raw["year_month"].min()
+all_months = []
+y, m = int(min_ym[:4]), int(min_ym[5:])
+while (y, m) <= (today.year, today.month):
+    all_months.append(f"{y}-{m:02d}")
+    m += 1
+    if m > 12: m = 1; y += 1
 
 tab_monthly, tab_weekly, tab_chart = st.tabs(["月報", "週報", "グラフ"])
 
@@ -51,72 +82,54 @@ tab_monthly, tab_weekly, tab_chart = st.tabs(["月報", "週報", "グラフ"])
 # 月報タブ
 # ================================================================
 with tab_monthly:
-    month_list = sorted(df_raw["year_month"].unique().tolist(), reverse=True)
-    sel_month  = st.selectbox("対象月を選択", month_list, key="rep_month")
-
+    sel_month = st.selectbox("対象月を選択", list(reversed(all_months)), key="rep_month")
     df_m = df_raw[df_raw["year_month"] == sel_month]
 
-    col1, col2, col3 = st.columns(3)
-    total_h   = df_m["work_hours"].sum()
-    work_days = df_m[df_m["attendance_type"].isin(
-        ["出社", "在宅", "出社+在宅"])]["date"].nunique()
-    leave_days = df_m[df_m["attendance_type"].isin(
-        ["有給", "午前半休", "午後半休", "欠勤", "特別休暇"])]["date"].nunique()
+    col1, col2, col3, col4 = st.columns(4)
+    total_h    = df_m["work_hours"].sum()
+    work_days  = df_m[df_m["attendance_type"].isin(["出社","在宅","出社+在宅"])]["date"].nunique()
+    leave_days = df_m[df_m["attendance_type"].isin(["有給","午前半休","午後半休","欠勤","特別休暇"])]["date"].nunique()
+    avg_h      = total_h / work_days if work_days > 0 else 0
 
     col1.metric("合計稼働時間", f"{total_h:.1f} h")
     col2.metric("稼働日数",    f"{work_days} 日")
-    col3.metric("休暇日数",    f"{leave_days} 日")
+    col3.metric("平均稼働時間/日", f"{avg_h:.1f} h")
+    col4.metric("休暇日数",    f"{leave_days} 日")
 
-    # 勤怠区分集計
     st.markdown("#### 勤怠区分別集計")
     att_summary = (
         df_m.groupby("attendance_type")["work_hours"]
-        .agg(["count", "sum"])
-        .rename(columns={"count": "日数", "sum": "合計時間"})
+        .agg(["count","sum"])
+        .rename(columns={"count":"日数","sum":"合計時間(h)"})
         .reset_index()
-        .rename(columns={"attendance_type": "勤怠区分"})
+        .rename(columns={"attendance_type":"勤怠区分"})
     )
-    att_summary["合計時間"] = att_summary["合計時間"].map(lambda x: f"{x:.1f} h")
+    att_summary["合計時間(h)"] = att_summary["合計時間(h)"].map(lambda x: f"{x:.1f}")
     st.dataframe(att_summary, use_container_width=True, hide_index=True)
 
-    # 業務内容まとめ
     st.markdown("#### 業務内容まとめ")
     df_m_sorted = df_m.sort_values("date")
     rows = ""
     for _, r in df_m_sorted.iterrows():
-        rows += f"""
-        <tr>
-            <td>{r['date'].strftime('%m/%d')}</td>
-            <td>{r.get('company','')}</td>
-            <td>{r.get('attendance_type','')}</td>
-            <td>{r.get('work_hours',0):.1f}</td>
-            <td>{r.get('work_content','')}</td>
-        </tr>"""
+        rows += (
+            f"<tr><td>{r['date'].strftime('%m/%d')}</td>"
+            f"<td>{r.get('company','')}</td>"
+            f"<td>{r.get('attendance_type','')}</td>"
+            f"<td style='text-align:right'>{r.get('work_hours',0):.1f}</td>"
+            f"<td>{r.get('work_content','')}</td></tr>"
+        )
     st.markdown(
-        f"""
-        <div class="table-wrap">
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>日付</th><th>会社名</th><th>勤怠</th>
-                    <th>時間(h)</th><th>業務内容</th>
-                </tr>
-            </thead>
-            <tbody>{rows}</tbody>
-        </table>
-        </div>
-        """,
+        f"""<div class="table-wrap"><table class="styled-table">
+        <thead><tr><th>日付</th><th>会社名</th><th>勤怠</th><th>時間(h)</th><th>業務内容</th></tr></thead>
+        <tbody>{rows}</tbody></table></div>""",
         unsafe_allow_html=True,
     )
 
-    # CSV ダウンロード
     csv_data = df_m.sort_values("date").to_csv(index=False, encoding="utf-8-sig")
-    st.download_button(
-        "月報 CSV をダウンロード",
-        data=csv_data.encode("utf-8-sig"),
-        file_name=f"monthly_report_{sel_month}.csv",
-        mime="text/csv",
-    )
+    st.download_button("月報 CSV をダウンロード",
+                       data=csv_data.encode("utf-8-sig"),
+                       file_name=f"monthly_report_{sel_month}.csv",
+                       mime="text/csv")
 
 # ================================================================
 # 週報タブ
@@ -124,96 +137,162 @@ with tab_monthly:
 with tab_weekly:
     week_list = sorted(df_raw["year_week"].unique().tolist(), reverse=True)
     sel_week  = st.selectbox("対象週を選択", week_list, key="rep_week")
-
     df_w = df_raw[df_raw["year_week"] == sel_week]
 
-    wc1, wc2 = st.columns(2)
+    wc1, wc2, wc3 = st.columns(3)
     wc1.metric("週合計稼働時間", f"{df_w['work_hours'].sum():.1f} h")
     wc2.metric("稼働日数",       f"{df_w['date'].nunique()} 日")
+    wc3.metric("平均稼働時間/日",
+               f"{df_w['work_hours'].sum()/df_w['date'].nunique():.1f} h"
+               if df_w['date'].nunique() > 0 else "0.0 h")
 
-    st.markdown("#### 日別サマリー")
-    day_summary = (
-        df_w.groupby(df_w["date"].dt.strftime("%m/%d (%a)"))["work_hours"]
-        .sum()
-        .reset_index()
-        .rename(columns={"date": "日付", "work_hours": "稼働時間 (h)"})
+    # 週内の日別棒グラフ
+    day_df = (
+        df_w.groupby(df_w["date"].dt.strftime("%m/%d(%a)"))["work_hours"]
+        .sum().reset_index()
+        .rename(columns={"date":"日付","work_hours":"稼働時間(h)"})
+        .sort_values("日付")
     )
-    day_summary["稼働時間 (h)"] = day_summary["稼働時間 (h)"].map(lambda x: f"{x:.1f}")
-    st.dataframe(day_summary, use_container_width=True, hide_index=True)
+    fig_week = go.Figure(go.Bar(
+        x=day_df["日付"], y=day_df["稼働時間(h)"],
+        marker_color=ACCENT, text=day_df["稼働時間(h)"].map(lambda x: f"{x:.1f}h"),
+        textposition="outside", textfont=dict(color=TEXT_COLOR, size=11),
+    ))
+    fig_week.update_layout(**base_layout("日別稼働時間"), height=260)
+    fig_week.update_yaxes(range=[0, day_df["稼働時間(h)"].max() * 1.3 + 1])
+    st.plotly_chart(fig_week, use_container_width=True)
 
     st.markdown("#### 業務内容")
     df_w_sorted = df_w.sort_values("date")
     rows = ""
     for _, r in df_w_sorted.iterrows():
-        rows += f"""
-        <tr>
-            <td>{r['date'].strftime('%m/%d (%a)')}</td>
-            <td>{r.get('attendance_type','')}</td>
-            <td>{r.get('work_hours',0):.1f}</td>
-            <td>{r.get('work_content','')}</td>
-            <td>{r.get('remarks','')}</td>
-        </tr>"""
+        rows += (
+            f"<tr><td>{r['date'].strftime('%m/%d(%a)')}</td>"
+            f"<td>{r.get('attendance_type','')}</td>"
+            f"<td style='text-align:right'>{r.get('work_hours',0):.1f}</td>"
+            f"<td>{r.get('work_content','')}</td>"
+            f"<td>{r.get('remarks','')}</td></tr>"
+        )
     st.markdown(
-        f"""
-        <div class="table-wrap">
-        <table class="styled-table">
-            <thead>
-                <tr>
-                    <th>日付</th><th>勤怠</th><th>時間(h)</th>
-                    <th>業務内容</th><th>備考</th>
-                </tr>
-            </thead>
-            <tbody>{rows}</tbody>
-        </table>
-        </div>
-        """,
+        f"""<div class="table-wrap"><table class="styled-table">
+        <thead><tr><th>日付</th><th>勤怠</th><th>時間(h)</th><th>業務内容</th><th>備考</th></tr></thead>
+        <tbody>{rows}</tbody></table></div>""",
         unsafe_allow_html=True,
     )
 
     csv_data_w = df_w.sort_values("date").to_csv(index=False, encoding="utf-8-sig")
-    st.download_button(
-        "週報 CSV をダウンロード",
-        data=csv_data_w.encode("utf-8-sig"),
-        file_name=f"weekly_report_{sel_week}.csv",
-        mime="text/csv",
-    )
+    st.download_button("週報 CSV をダウンロード",
+                       data=csv_data_w.encode("utf-8-sig"),
+                       file_name=f"weekly_report_{sel_week}.csv",
+                       mime="text/csv")
 
 # ================================================================
 # グラフタブ
 # ================================================================
 with tab_chart:
-    st.markdown("#### 月別稼働時間推移")
-    monthly_summary = (
-        df_raw.groupby("year_month")["work_hours"]
-        .sum()
-        .reset_index()
-        .sort_values("year_month")
-    )
-    monthly_summary.columns = ["月", "稼働時間 (h)"]
-    st.bar_chart(monthly_summary.set_index("月"))
 
-    st.markdown("#### 勤怠区分の分布（全期間）")
-    att_dist = df_raw["attendance_type"].value_counts().reset_index()
-    att_dist.columns = ["勤怠区分", "件数"]
-    st.bar_chart(att_dist.set_index("勤怠区分"))
-
-    st.markdown("#### 週別稼働時間推移")
-    weekly_summary = (
-        df_raw.groupby("year_week")["work_hours"]
-        .sum()
-        .reset_index()
-        .sort_values("year_week")
-        .tail(12)  # 直近12週
+    # ---- 1. 月別稼働時間（折れ線 + 棒） ----
+    monthly_df = (
+        df_raw.groupby("year_month")["work_hours"].sum()
+        .reset_index().sort_values("year_month")
+        .rename(columns={"year_month":"月","work_hours":"稼働時間(h)"})
     )
-    weekly_summary.columns = ["週", "稼働時間 (h)"]
-    st.line_chart(weekly_summary.set_index("週"))
+    # 全月を埋める
+    monthly_full = pd.DataFrame({"月": all_months})
+    monthly_full = monthly_full.merge(monthly_df, on="月", how="left").fillna(0)
 
-    st.markdown("#### 会社別稼働時間")
-    company_summary = (
-        df_raw.groupby("company")["work_hours"]
-        .sum()
-        .reset_index()
-        .sort_values("work_hours", ascending=False)
+    fig1 = go.Figure()
+    fig1.add_trace(go.Bar(
+        x=monthly_full["月"], y=monthly_full["稼働時間(h)"],
+        name="稼働時間", marker_color=ACCENT, opacity=0.7,
+        text=monthly_full["稼働時間(h)"].map(lambda x: f"{x:.0f}h" if x > 0 else ""),
+        textposition="outside", textfont=dict(color=TEXT_COLOR, size=10),
+    ))
+    fig1.add_trace(go.Scatter(
+        x=monthly_full["月"], y=monthly_full["稼働時間(h)"],
+        mode="lines+markers", name="推移",
+        line=dict(color="#6366f1", width=2),
+        marker=dict(color="#6366f1", size=6),
+    ))
+    fig1.update_layout(**base_layout("月別稼働時間推移"), height=320,
+                       yaxis_title="時間 (h)", showlegend=False)
+    st.plotly_chart(fig1, use_container_width=True)
+
+    col_a, col_b = st.columns(2)
+
+    # ---- 2. 勤怠区分の割合（ドーナツ） ----
+    with col_a:
+        att_dist = df_raw["attendance_type"].value_counts().reset_index()
+        att_dist.columns = ["勤怠区分","件数"]
+        fig2 = go.Figure(go.Pie(
+            labels=att_dist["勤怠区分"], values=att_dist["件数"],
+            hole=0.55,
+            marker=dict(colors=PALETTE[:len(att_dist)],
+                        line=dict(color=PAPER_BG, width=2)),
+            textfont=dict(color="#e2e8f0", size=11),
+        ))
+        fig2.update_layout(**base_layout("勤怠区分の内訳（全期間）"),
+                           height=300, margin=dict(l=0, r=0, t=40, b=0))
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # ---- 3. 会社別稼働時間（横棒） ----
+    with col_b:
+        co_df = (
+            df_raw[df_raw["company"] != ""].groupby("company")["work_hours"]
+            .sum().reset_index().sort_values("work_hours")
+            .rename(columns={"company":"会社名","work_hours":"稼働時間(h)"})
+        )
+        fig3 = go.Figure(go.Bar(
+            x=co_df["稼働時間(h)"], y=co_df["会社名"],
+            orientation="h",
+            marker=dict(
+                color=co_df["稼働時間(h)"],
+                colorscale=[[0,"#1e3a5f"],[1,"#3b82f6"]],
+                showscale=False,
+            ),
+            text=co_df["稼働時間(h)"].map(lambda x: f"{x:.0f}h"),
+            textposition="outside", textfont=dict(color=TEXT_COLOR, size=11),
+        ))
+        fig3.update_layout(**base_layout("会社別稼働時間（全期間）"),
+                           height=300, xaxis_title="時間 (h)")
+        st.plotly_chart(fig3, use_container_width=True)
+
+    # ---- 4. 直近12週の稼働時間（折れ線） ----
+    weekly_df = (
+        df_raw.groupby("year_week")["work_hours"].sum()
+        .reset_index().sort_values("year_week").tail(12)
+        .rename(columns={"year_week":"週","work_hours":"稼働時間(h)"})
     )
-    company_summary.columns = ["会社名", "稼働時間 (h)"]
-    st.bar_chart(company_summary.set_index("会社名"))
+    fig4 = go.Figure()
+    fig4.add_trace(go.Scatter(
+        x=weekly_df["週"], y=weekly_df["稼働時間(h)"],
+        mode="lines+markers+text",
+        line=dict(color=ACCENT, width=2),
+        marker=dict(color=ACCENT, size=7),
+        fill="tozeroy", fillcolor="rgba(59,130,246,0.1)",
+        text=weekly_df["稼働時間(h)"].map(lambda x: f"{x:.0f}h"),
+        textposition="top center", textfont=dict(color=TEXT_COLOR, size=10),
+    ))
+    fig4.update_layout(**base_layout("直近12週の稼働時間推移"),
+                       height=280, yaxis_title="時間 (h)", showlegend=False)
+    st.plotly_chart(fig4, use_container_width=True)
+
+    # ---- 5. 月別 勤怠区分の積み上げ棒 ----
+    att_monthly = (
+        df_raw.groupby(["year_month","attendance_type"])["work_hours"]
+        .sum().reset_index()
+    )
+    att_types = att_monthly["attendance_type"].unique().tolist()
+    fig5 = go.Figure()
+    for i, att in enumerate(att_types):
+        sub = att_monthly[att_monthly["attendance_type"] == att]
+        sub_full = pd.DataFrame({"year_month": all_months}).merge(
+            sub, on="year_month", how="left").fillna(0)
+        fig5.add_trace(go.Bar(
+            x=sub_full["year_month"], y=sub_full["work_hours"],
+            name=att,
+            marker_color=PALETTE[i % len(PALETTE)],
+        ))
+    fig5.update_layout(**base_layout("月別 勤怠区分別稼働時間"),
+                       barmode="stack", height=320, yaxis_title="時間 (h)")
+    st.plotly_chart(fig5, use_container_width=True)
