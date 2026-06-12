@@ -24,8 +24,8 @@ THEME_CSS = """
 
 /* ===== メインコンテンツ ===== */
 .main .block-container {
-    padding: 1.5rem 2rem 3rem;
-    max-width: 960px;
+    padding: 1.5rem 1.5rem 3rem;
+    max-width: 1100px;
 }
 
 /* ===== ページタイトル ===== */
@@ -151,35 +151,26 @@ div[data-testid="stMetricValue"] {
     border-radius: 6px;
 }
 
-/* ===== 時刻入力ヘルパーテキスト ===== */
-.time-hint {
-    font-size: 0.72rem;
-    color: #64748b;
-    margin-top: -0.4rem;
-    margin-bottom: 0.5rem;
-}
-
 /* ===== レスポンシブ (スマホ) ===== */
 @media (max-width: 768px) {
     .main .block-container {
-        padding: 0.75rem 0.75rem 2rem;
+        padding: 0.75rem 0.5rem 2rem;
     }
-    .page-header h1 { font-size: 1.15rem; }
+    .page-header h1 { font-size: 1.2rem; }
     .page-header p  { font-size: 0.78rem; }
-    .kpi-value      { font-size: 1.5rem; }
-    .kpi-label      { font-size: 0.68rem; }
-    .kpi-card       { padding: 0.85rem 0.6rem; }
-    .section-card   { padding: 0.85rem 0.75rem; }
-    .styled-table   { font-size: 0.76rem; }
-    .styled-table th, .styled-table td { padding: 0.45rem 0.4rem; }
+    .kpi-value      { font-size: 1.6rem; }
+    .kpi-label      { font-size: 0.7rem; }
+    .kpi-card       { padding: 0.9rem 0.75rem; }
+    .section-card   { padding: 0.9rem; }
+    .styled-table   { font-size: 0.78rem; }
+    .styled-table th, .styled-table td { padding: 0.5rem 0.5rem; }
+    /* フォーム列をスマホで縦積み */
     div[data-testid="column"] { min-width: 0; }
-    .stButton > button { min-height: 2.8rem; font-size: 0.95rem; }
-}
+    /* タッチしやすいボタン */
+    .stButton > button { min-height: 3rem; font-size: 1rem; }
+    }
 </style>
 """
-
-
-APP_VERSION = "1.1.0"
 
 
 def render_sidebar() -> None:
@@ -189,15 +180,9 @@ def render_sidebar() -> None:
 
     with st.sidebar:
         st.markdown("## SES業務管理")
-        st.markdown(
-            f"<div style='font-size:0.72rem; color:#475569; margin-top:-0.5rem; "
-            f"margin-bottom:0.75rem; padding-left:0.1rem;'>ver {APP_VERSION}</div>",
-            unsafe_allow_html=True,
-        )
         st.markdown("---")
         st.markdown(
-            "<div style='font-size:0.75rem; color:#64748b; padding: 0 0.25rem; "
-            "margin-bottom:0.25rem;'>ナビゲーション</div>",
+            "<div style='font-size:0.78rem; color:#64748b; padding: 0 0.5rem;'>ナビゲーション</div>",
             unsafe_allow_html=True,
         )
         st.page_link("app.py",                    label="ダッシュボード")
