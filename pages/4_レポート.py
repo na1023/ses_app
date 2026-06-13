@@ -91,9 +91,9 @@ with tab_monthly:
     leave_days = df_m[df_m["attendance_type"].isin(["有給","午前半休","午後半休","特別休暇","振替休日","欠勤"])]["date"].nunique()
     avg_h      = total_h / work_days if work_days > 0 else 0
 
-    col1.metric("合計稼働時間", f"{total_h:.1f} h")
+    col1.metric("合計稼働時間", f"{total_h:.2f} h")
     col2.metric("稼働日数",    f"{work_days} 日")
-    col3.metric("平均稼働時間/日", f"{avg_h:.1f} h")
+    col3.metric("平均稼働時間/日", f"{avg_h:.2f} h")
     col4.metric("休暇日数",    f"{leave_days} 日")
 
     st.markdown("#### 勤怠区分別集計")
@@ -140,11 +140,11 @@ with tab_weekly:
     df_w = df_raw[df_raw["year_week"] == sel_week]
 
     wc1, wc2, wc3 = st.columns(3)
-    wc1.metric("週合計稼働時間", f"{df_w['work_hours'].sum():.1f} h")
+    wc1.metric("週合計稼働時間", f"{df_w['work_hours'].sum():.2f} h")
     wc2.metric("稼働日数",       f"{df_w['date'].nunique()} 日")
     wc3.metric("平均稼働時間/日",
-               f"{df_w['work_hours'].sum()/df_w['date'].nunique():.1f} h"
-               if df_w['date'].nunique() > 0 else "0.0 h")
+               f"{df_w['work_hours'].sum()/df_w['date'].nunique():.2f} h"
+               if df_w['date'].nunique() > 0 else "0.00 h")
 
     # 週内の日別棒グラフ
     day_df = (

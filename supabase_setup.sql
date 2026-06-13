@@ -8,10 +8,14 @@
     id           text primary key,
     company      text default '',
     project_name text default '',
+    status       text default '参画前',
     start_date   text default '',
     end_date     text default '',
     memo         text default ''
   );
+
+  -- 既存テーブルへの列追加（すでにテーブルがある場合）
+  alter table projects add column if not exists status text default '参画前';
 
   -- 面談
   create table if not exists interviews (

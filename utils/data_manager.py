@@ -32,8 +32,8 @@ PATHS = {
 # ---- スキーマ定義 ----
 SCHEMAS = {
     "projects": {
-        "columns": ["id", "company", "project_name", "start_date", "end_date", "memo"],
-        "dtypes":  {"id": str, "company": str, "project_name": str,
+        "columns": ["id", "company", "project_name", "status", "start_date", "end_date", "memo"],
+        "dtypes":  {"id": str, "company": str, "project_name": str, "status": str,
                     "start_date": str, "end_date": str, "memo": str},
     },
     "interviews": {

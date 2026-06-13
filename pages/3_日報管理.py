@@ -317,7 +317,7 @@ if sel_company != "全社":   df_view = df_view[df_view["company"] == sel_compan
 df_view = df_view.sort_values("date", ascending=False).reset_index(drop=True)
 
 total_h = pd.to_numeric(df_view["work_hours"], errors="coerce").sum()
-fc3.metric("表示期間の合計稼働時間", f"{total_h:.1f} h")
+fc3.metric("表示期間の合計稼働時間", f"{total_h:.2f} h")
 st.caption(f"表示件数: {len(df_view)} 件")
 
 for _, row in df_view.iterrows():
