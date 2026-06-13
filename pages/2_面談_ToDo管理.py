@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import (
     load, save, generate_id, init_all,
-    get_company_list, get_project_list_by_company,
+    get_company_list, get_project_list_by_company, get_project_options,
 )
 from utils.styles import THEME_CSS, status_badge, render_sidebar
 
@@ -42,14 +42,30 @@ companies = get_company_list()
 # ================================================================
 with tab_interview:
     with st.expander("面談を登録する", expanded=False):
+        # 案件マスタから候補を取得（サジェスト用・強制はしない）
+        all_projects = get_project_options()
+        all_co_hints = sorted({p["company"] for p in all_projects})
         iv_c1, iv_c2 = st.columns(2)
-        company_sel  = iv_c1.selectbox("会社名", [""] + companies, key="iv_company")
-        iv_projects  = get_project_list_by_company(company_sel) if company_sel else []
-        project_sel  = iv_c2.selectbox("案件名", [""] + iv_projects, key="iv_project")
+        company_sel = iv_c1.text_input(
+            "会社名（自由入力）",
+            key="iv_company",
+            placeholder="例: Sky株式会社",
+        )
+        if all_co_hints:
+            iv_c1.caption("登録済み: " + "　".join(all_co_hints))
+
+        proj_hints = [p["project_name"] for p in all_projects if p["company"] == company_sel]
+        project_sel = iv_c2.text_input(
+            "案件名（自由入力）",
+            key="iv_project",
+            placeholder="例: カメラ評価",
+        )
+        if proj_hints:
+            iv_c2.caption("登録済み: " + "　".join(proj_hints))
 
         with st.form("add_interview_form", clear_on_submit=True):
             r2c1, r2c2 = st.columns(2)
-            interview_date = r2c1.date_input("面談日")
+            interview_date = r2c1.text_input("面談日 (YYYY-MM-DD)", placeholder="2026-06-15")
             status         = r2c2.selectbox("ステータス", ["結果待ち", "通過", "不通過"])
 
             work_content       = st.text_area("業務内容", height=80, placeholder="担当する業務の概要")
@@ -58,18 +74,18 @@ with tab_interview:
             submitted = st.form_submit_button("登録する", use_container_width=True)
 
         if submitted:
-            if not company_sel or not project_sel:
-                st.error("会社名と案件名を選択してください。")
+            if not company_sel.strip():
+                st.error("会社名を入力してください。")
             else:
                 df = load("interviews")
                 df = pd.concat([df, pd.DataFrame([{
                     "id":                 generate_id(),
-                    "company":            company_sel,
-                    "project_name":       project_sel,
+                    "company":            company_sel.strip(),
+                    "project_name":       project_sel.strip(),
                     "work_content":       work_content,
                     "attendance_content": attendance_content,
                     "status":             status,
-                    "interview_date":     str(interview_date),
+                    "interview_date":     interview_date.strip(),
                     "memo":               memo,
                 }])], ignore_index=True)
                 save("interviews", df)
@@ -123,18 +139,16 @@ with tab_interview:
 
                 # 編集フォーム
                 if st.session_state.get(edit_key):
-                    all_cos  = get_company_list()
                     ie1, ie2 = st.columns(2)
-                    cur_co_idx = ([""] + all_cos).index(row.get("company","")) \
-                        if row.get("company","") in all_cos else 0
-                    iv_edit_co   = ie1.selectbox("会社名", [""] + all_cos,
-                                                  index=cur_co_idx, key=f"iv_eco_{rid}")
-                    iv_edit_projs = get_project_list_by_company(iv_edit_co) if iv_edit_co else []
-                    cur_pr       = row.get("project_name","")
-                    iv_pr_opts   = [""] + iv_edit_projs
-                    iv_pr_idx    = iv_pr_opts.index(cur_pr) if cur_pr in iv_pr_opts else 0
-                    iv_edit_proj = ie2.selectbox("案件名", iv_pr_opts,
-                                                  index=iv_pr_idx, key=f"iv_epr_{rid}")
+                    iv_edit_co   = ie1.text_input("会社名（自由入力）", value=row.get("company",""),      key=f"iv_eco_{rid}")
+                    iv_edit_proj = ie2.text_input("案件名（自由入力）", value=row.get("project_name",""), key=f"iv_epr_{rid}")
+                    # サジェスト表示
+                    _co_hints = sorted({p["company"] for p in get_project_options()})
+                    if _co_hints:
+                        ie1.caption("登録済み: " + "　".join(_co_hints))
+                    _pr_hints = [p["project_name"] for p in get_project_options() if p["company"] == iv_edit_co]
+                    if _pr_hints:
+                        ie2.caption("登録済み: " + "　".join(_pr_hints))
 
                     with st.form(f"iv_edit_form_{rid}"):
                         ef3, ef4 = st.columns(2)
