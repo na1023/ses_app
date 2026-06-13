@@ -36,21 +36,31 @@ st.markdown(
 )
 
 ATTENDANCE_OPTIONS = [
-    "出社", "在宅", "出社+在宅", "有給", "午前半休", "午後半休",
-    "欠勤", "特別休暇", "その他",
+    # 通常勤務
+    "出社", "在宅", "出社+在宅",
+    # 遅刻・早退
+    "遅刻", "早退", "遅刻+早退",
+    # 休暇・休日
+    "有給", "午前半休", "午後半休", "特別休暇",
+    # 欠勤・その他
+    "欠勤", "振替休日", "その他",
 ]
 
 # 勤怠区分ごとのカラー（カレンダー用）
 ATT_COLOR = {
-    "出社":     "#3b82f6",
-    "在宅":     "#6366f1",
-    "出社+在宅": "#8b5cf6",
-    "有給":     "#f59e0b",
-    "午前半休": "#f97316",
-    "午後半休": "#f97316",
-    "欠勤":     "#ef4444",
-    "特別休暇": "#10b981",
-    "その他":   "#64748b",
+    "出社":       "#3b82f6",
+    "在宅":       "#6366f1",
+    "出社+在宅":  "#8b5cf6",
+    "遅刻":       "#fb923c",
+    "早退":       "#fb923c",
+    "遅刻+早退":  "#f97316",
+    "有給":       "#f59e0b",
+    "午前半休":   "#fbbf24",
+    "午後半休":   "#fbbf24",
+    "特別休暇":   "#10b981",
+    "欠勤":       "#ef4444",
+    "振替休日":   "#14b8a6",
+    "その他":     "#64748b",
 }
 
 
@@ -137,8 +147,12 @@ def render_calendar(year: int, month: int, recorded: dict) -> str:
         if k in recorded.values()
     )
 
+    jp_months = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]
+    title = f"{year}年{jp_months[month-1]}"
+
     return f"""
     <div style='background:#161b27;border:1px solid #1e2a3a;border-radius:10px;padding:1rem;margin-bottom:1rem;'>
+      <div style='font-size:0.95rem;font-weight:700;color:#e2e8f0;margin-bottom:0.6rem;'>{title}</div>
       <table style='width:100%;border-collapse:separate;border-spacing:3px;'>
         <thead><tr>{header_cells}</tr></thead>
         <tbody>{rows_html}</tbody>
@@ -173,9 +187,17 @@ while (y, m) <= (today.year, today.month):
     if m > 12:
         m = 1; y += 1
 
+JP_MONTHS = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]
+
+def ym_to_jp(ym: str) -> str:
+    y, m = int(ym[:4]), int(ym[5:])
+    return f"{y}年{JP_MONTHS[m-1]}"
+
+months_reversed = list(reversed(all_months))
 cal_month = st.selectbox(
     "表示月",
-    list(reversed(all_months)),
+    months_reversed,
+    format_func=ym_to_jp,
     key="cal_month",
     index=0,
 )
@@ -200,16 +222,38 @@ st.caption(f"{cal_month}：{cnt} 日 / {total_days} 日 入力済み")
 st.markdown("---")
 
 # ===== 日報入力フォーム =====
+def parse_date(s: str) -> str | None:
+    """YYYY-MM-DD / YYYY/MM/DD / YYYYMMDD を YYYY-MM-DD に正規化、不正は None"""
+    s = s.strip().replace("/", "-")
+    if len(s) == 8 and s.isdigit():
+        s = f"{s[:4]}-{s[4:6]}-{s[6:]}"
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return s
+    except ValueError:
+        return None
+
+
 with st.expander("日報を入力する", expanded=True):
     rc1, rc2, rc3 = st.columns([1, 1, 1])
-    reg_date    = rc1.date_input("日付 *", value=date.today(), key="reg_date")
+    reg_date_raw = rc1.text_input(
+        "日付 *",
+        value=date.today().strftime("%Y-%m-%d"),
+        key="reg_date",
+        placeholder="YYYY-MM-DD",
+        max_chars=10,
+    )
     reg_company = rc2.selectbox("会社名 *", [""] + companies, key="reg_company")
     reg_projs   = get_project_list_by_company(reg_company) if reg_company else []
     reg_project = rc3.selectbox("案件名 *", [""] + reg_projs, key="reg_project")
 
-    # 同日付の重複チェック（フォーム外でリアルタイム判定）
+    reg_date = parse_date(reg_date_raw)
+    if reg_date_raw and reg_date is None:
+        st.error("日付の形式が正しくありません。YYYY-MM-DD で入力してください。")
+
+    # 同日付の重複チェック
     dup_dates = set(df_all_daily["date"].tolist()) if not df_all_daily.empty else set()
-    if str(reg_date) in dup_dates:
+    if reg_date and reg_date in dup_dates:
         st.warning(f"{reg_date} の日報はすでに登録されています。内容を確認してから登録してください。")
 
     with st.form("daily_report_form", clear_on_submit=True):
@@ -226,6 +270,7 @@ with st.expander("日報を入力する", expanded=True):
 
     if submitted:
         errors = []
+        if not reg_date:             errors.append("日付を正しく入力してください（YYYY-MM-DD）。")
         if not reg_company:          errors.append("会社名を選択してください。")
         if not reg_project:          errors.append("案件名を選択してください。")
         if not work_content.strip(): errors.append("業務内容を入力してください。")
@@ -236,7 +281,7 @@ with st.expander("日報を入力する", expanded=True):
             wh = calc_work_hours(st_s, st_e, st_b)
             append_row("daily", {
                 "id":              generate_id(),
-                "date":            str(reg_date),
+                "date":            reg_date,
                 "company":         reg_company,
                 "project_name":    reg_project,
                 "attendance_type": attendance,
@@ -262,7 +307,12 @@ if df.empty:
     st.stop()
 
 fc1, fc2, fc3 = st.columns(3)
-sel_month   = fc1.selectbox("月で絞り込み",   ["全期間"] + list(reversed(all_months)), key="dr_month")
+sel_month   = fc1.selectbox(
+    "月で絞り込み",
+    ["全期間"] + list(reversed(all_months)),
+    format_func=lambda v: v if v == "全期間" else ym_to_jp(v),
+    key="dr_month",
+)
 sel_company = fc2.selectbox("会社で絞り込み", ["全社"]   + companies,                  key="dr_company_f")
 
 df_view = df.copy()

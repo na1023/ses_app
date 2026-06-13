@@ -87,8 +87,8 @@ with tab_monthly:
 
     col1, col2, col3, col4 = st.columns(4)
     total_h    = df_m["work_hours"].sum()
-    work_days  = df_m[df_m["attendance_type"].isin(["出社","在宅","出社+在宅"])]["date"].nunique()
-    leave_days = df_m[df_m["attendance_type"].isin(["有給","午前半休","午後半休","欠勤","特別休暇"])]["date"].nunique()
+    work_days  = df_m[df_m["attendance_type"].isin(["出社","在宅","出社+在宅","遅刻","早退","遅刻+早退"])]["date"].nunique()
+    leave_days = df_m[df_m["attendance_type"].isin(["有給","午前半休","午後半休","特別休暇","振替休日","欠勤"])]["date"].nunique()
     avg_h      = total_h / work_days if work_days > 0 else 0
 
     col1.metric("合計稼働時間", f"{total_h:.1f} h")
