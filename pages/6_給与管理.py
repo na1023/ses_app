@@ -95,7 +95,7 @@ def calc_summary(row: dict) -> dict:
     transport_total = sum(to_int(row.get(k, 0)) for k in NON_TAXABLE_KEYS)
     deduction_total = sum(to_int(row.get(k, 0)) for k, _ in DEDUCTION_FIELDS)
     tax_adj         = to_int(row.get("tax_adjustment", 0))   # +還付 / -追徴
-    take_home       = income_total - deduction_total + tax_adj
+    take_home       = taxable_income - deduction_total + tax_adj
     return {
         "income_total":    income_total,
         "taxable_income":  taxable_income,
@@ -576,8 +576,9 @@ with tab_summary:
         else:
             df["income_total"]    = df[[k for k, _ in INCOME_FIELDS]].sum(axis=1)
             df["deduction_total"] = df[[k for k, _ in DEDUCTION_FIELDS]].sum(axis=1)
-        df["tax_adjustment"] = df["tax_adjustment"].apply(to_int) if "tax_adjustment" in df.columns else 0
-        df["take_home"]      = df["income_total"] - df["deduction_total"] + df.get("tax_adjustment", 0)
+        df["taxable_income"]  = df[[k for k, _ in INCOME_FIELDS if k not in NON_TAXABLE_KEYS]].sum(axis=1)
+        df["tax_adjustment"]  = df["tax_adjustment"].apply(to_int) if "tax_adjustment" in df.columns else 0
+        df["take_home"]       = df["taxable_income"] - df["deduction_total"] + df.get("tax_adjustment", 0)
         return df
 
     df_year_sal = add_totals(df_year_sal, False)
