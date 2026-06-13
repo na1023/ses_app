@@ -66,7 +66,7 @@ with tab_interview:
         with st.form("add_interview_form", clear_on_submit=True):
             r2c1, r2c2 = st.columns(2)
             interview_date = r2c1.text_input("面談日 (YYYY-MM-DD)", placeholder="2026-06-15")
-            status         = r2c2.selectbox("ステータス", ["結果待ち", "通過", "不通過"])
+            status         = r2c2.selectbox("ステータス", ["結果待ち", "通過", "不通過","辞退"])
 
             work_content       = st.text_area("業務内容", height=80, placeholder="担当する業務の概要")
             attendance_content = st.text_area("勤怠内容", height=60, placeholder="週5日フルリモート 等")
@@ -101,8 +101,8 @@ with tab_interview:
     else:
         status_filter = st.multiselect(
             "ステータスで絞り込み",
-            ["通過", "不通過", "結果待ち"],
-            default=["通過", "不通過", "結果待ち"],
+            ["通過", "不通過", "結果待ち","辞退"],
+            default=["通過", "不通過", "結果待ち","辞退"],
             key="iv_filter",
         )
         df_show = df_iv[df_iv["status"].isin(status_filter)].sort_values(
