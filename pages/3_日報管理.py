@@ -245,14 +245,17 @@ LATE_EARLY_LABEL = {"遅刻": "遅刻時間 (h)", "早退": "早退時間 (h)", 
 
 with st.expander("日報を入力する", expanded=True):
     show_flash()
-    rc1, rc2, rc3, rc4 = st.columns([1, 1, 1, 1])
-    with rc1:
+    # 1行目：日付（広め）＋勤怠区分
+    dr1, dr2 = st.columns([3, 1])
+    with dr1:
         st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>日付 *</div>", unsafe_allow_html=True)
         reg_date = jp_date_selector("reg_date", date.today())
+    reg_att = dr2.selectbox("勤怠区分 *", ATTENDANCE_OPTIONS, key="reg_att")
+    # 2行目：会社名・案件名
+    rc2, rc3 = st.columns([1, 1])
     reg_company = rc2.selectbox("会社名 *", [""] + companies, key="reg_company")
     reg_projs   = get_project_list_by_company(reg_company) if reg_company else []
     reg_project = rc3.selectbox("案件名 *", [""] + reg_projs, key="reg_project")
-    reg_att     = rc4.selectbox("勤怠区分 *", ATTENDANCE_OPTIONS, key="reg_att")
 
     # 同日付の重複チェック
     dup_dates = set(df_all_daily["date"].tolist()) if not df_all_daily.empty else set()
