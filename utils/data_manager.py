@@ -54,7 +54,7 @@ SCHEMAS = {
     },
     "salary": {
         "columns": [
-            "id", "year_month", "company",
+            "id", "year_month",
             "basic_salary", "skill_allowance", "qualification_allowance",
             "commute_allowance", "expense_reimbursement", "other_expense",
             "transport_allowance", "overtime_pay",
@@ -63,7 +63,7 @@ SCHEMAS = {
             "memo", "created_at",
         ],
         "dtypes": {k: str for k in [
-            "id", "year_month", "company",
+            "id", "year_month",
             "basic_salary", "skill_allowance", "qualification_allowance",
             "commute_allowance", "expense_reimbursement", "other_expense",
             "transport_allowance", "overtime_pay",

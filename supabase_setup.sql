@@ -60,7 +60,6 @@
   create table if not exists salary_records (
     id                       text primary key,
     year_month               text default '',
-    company                  text default '',
     basic_salary             text default '0',
     skill_allowance          text default '0',
     qualification_allowance  text default '0',
