@@ -222,34 +222,31 @@ st.caption(f"{cal_month}：{cnt} 日 / {total_days} 日 入力済み")
 st.markdown("---")
 
 # ===== 日報入力フォーム =====
-def parse_date(s: str) -> str | None:
-    """YYYY-MM-DD / YYYY/MM/DD / YYYYMMDD を YYYY-MM-DD に正規化、不正は None"""
-    s = s.strip().replace("/", "-")
-    if len(s) == 8 and s.isdigit():
-        s = f"{s[:4]}-{s[4:6]}-{s[6:]}"
-    try:
-        datetime.strptime(s, "%Y-%m-%d")
-        return s
-    except ValueError:
-        return None
+def jp_date_selector(key_prefix: str, default: date) -> str:
+    """年・月・日セレクトボックスで日付を選ばせ YYYY-MM-DD 文字列を返す"""
+    today = date.today()
+    years = list(range(today.year - 2, today.year + 2))
+    months_jp = [f"{m}月" for m in range(1, 13)]
+    d1, d2, d3 = st.columns(3)
+    sel_y = d1.selectbox("年",  years,       index=years.index(default.year) if default.year in years else len(years)-1, key=f"{key_prefix}_y", label_visibility="collapsed")
+    sel_m = d2.selectbox("月",  months_jp,   index=default.month - 1,                                                    key=f"{key_prefix}_m", label_visibility="collapsed")
+    sel_m_int = months_jp.index(sel_m) + 1
+    max_day = calendar.monthrange(sel_y, sel_m_int)[1]
+    days = list(range(1, max_day + 1))
+    sel_d = d3.selectbox("日",  [f"{d}日" for d in days], index=min(default.day, max_day) - 1,                          key=f"{key_prefix}_d", label_visibility="collapsed")
+    sel_d_int = int(sel_d.replace("日", ""))
+    st.caption(f"選択中: {sel_y}年{sel_m}{sel_d}")
+    return f"{sel_y}-{sel_m_int:02d}-{sel_d_int:02d}"
 
 
 with st.expander("日報を入力する", expanded=True):
     rc1, rc2, rc3 = st.columns([1, 1, 1])
-    reg_date_raw = rc1.text_input(
-        "日付 *",
-        value=date.today().strftime("%Y-%m-%d"),
-        key="reg_date",
-        placeholder="YYYY-MM-DD",
-        max_chars=10,
-    )
+    with rc1:
+        st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>日付 *</div>", unsafe_allow_html=True)
+        reg_date = jp_date_selector("reg_date", date.today())
     reg_company = rc2.selectbox("会社名 *", [""] + companies, key="reg_company")
     reg_projs   = get_project_list_by_company(reg_company) if reg_company else []
     reg_project = rc3.selectbox("案件名 *", [""] + reg_projs, key="reg_project")
-
-    reg_date = parse_date(reg_date_raw)
-    if reg_date_raw and reg_date is None:
-        st.error("日付の形式が正しくありません。YYYY-MM-DD で入力してください。")
 
     # 同日付の重複チェック
     dup_dates = set(df_all_daily["date"].tolist()) if not df_all_daily.empty else set()
@@ -270,7 +267,6 @@ with st.expander("日報を入力する", expanded=True):
 
     if submitted:
         errors = []
-        if not reg_date:             errors.append("日付を正しく入力してください（YYYY-MM-DD）。")
         if not reg_company:          errors.append("会社名を選択してください。")
         if not reg_project:          errors.append("案件名を選択してください。")
         if not work_content.strip(): errors.append("業務内容を入力してください。")
