@@ -49,7 +49,7 @@ with tab_interview:
         company_sel = iv_c1.text_input(
             "会社名（自由入力）",
             key="iv_company",
-            placeholder="例: Sky株式会社",
+            placeholder="例: 〇〇株式会社",
         )
         if all_co_hints:
             iv_c1.caption("登録済み: " + "　".join(all_co_hints))
@@ -58,7 +58,7 @@ with tab_interview:
         project_sel = iv_c2.text_input(
             "案件名（自由入力）",
             key="iv_project",
-            placeholder="例: カメラ評価",
+            placeholder="例: POSレジ改修",
         )
         if proj_hints:
             iv_c2.caption("登録済み: " + "　".join(proj_hints))
