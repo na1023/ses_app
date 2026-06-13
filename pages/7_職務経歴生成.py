@@ -10,7 +10,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, init_all, get_company_list
-from utils.styles import THEME_CSS, render_sidebar
+from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
 from utils.summarizer import extract_period, generate_career_markdown, generate_career_text
 
 st.set_page_config(page_title="職務経歴生成 | SES業務管理", layout="wide")
@@ -21,6 +21,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """

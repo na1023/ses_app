@@ -97,14 +97,24 @@ with tab_monthly:
     col4.metric("休暇日数",    f"{leave_days} 日")
 
     st.markdown("#### 勤怠区分別集計")
-    att_summary = (
-        df_m.groupby("attendance_type")["work_hours"]
-        .agg(["count","sum"])
-        .rename(columns={"count":"日数","sum":"合計時間(h)"})
-        .reset_index()
-        .rename(columns={"attendance_type":"勤怠区分"})
-    )
-    att_summary["合計時間(h)"] = att_summary["合計時間(h)"].map(lambda x: f"{x:.2f}")
+    LATE_EARLY_TYPES = {"遅刻", "早退", "遅刻+早退"}
+    df_m2 = df_m.copy()
+    if "late_early_time" not in df_m2.columns:
+        df_m2["late_early_time"] = 0.0
+    df_m2["late_early_time"] = pd.to_numeric(df_m2["late_early_time"], errors="coerce").fillna(0)
+    att_grp = df_m2.groupby("attendance_type")
+    att_rows = []
+    for att, grp in att_grp:
+        days = len(grp)
+        if att in LATE_EARLY_TYPES:
+            h = grp["late_early_time"].sum()
+            col_label = "遅刻/早退時間計(h)"
+        else:
+            h = grp["work_hours"].sum()
+            col_label = "合計時間(h)"
+        att_rows.append({"勤怠区分": att, "日数": days, "合計時間(h)": f"{h:.2f}",
+                         "備考": "遅刻/早退時間" if att in LATE_EARLY_TYPES else "稼働時間"})
+    att_summary = pd.DataFrame(att_rows)
     st.dataframe(att_summary, use_container_width=True, hide_index=True)
 
     st.markdown("#### 業務内容まとめ")

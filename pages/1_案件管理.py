@@ -9,7 +9,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, save, generate_id, init_all
-from utils.styles import THEME_CSS, render_sidebar, status_badge
+from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash, status_badge
 
 st.set_page_config(page_title="案件管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -19,6 +19,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """
@@ -60,7 +61,7 @@ with st.expander("新規案件を登録", expanded=False):
                 "memo":         memo,
             }])], ignore_index=True)
             save("projects", df)
-            st.success(f"案件「{project_name}」を登録しました。")
+            set_flash("success", f"案件「{project_name}」を登録しました。")
             st.rerun()
 
 # ===== 案件一覧 =====
@@ -167,7 +168,7 @@ for _, row in df_view.iterrows():
                 df_all.loc[m, "memo"]         = new_memo
                 save("projects", df_all)
                 st.session_state[edit_key] = False
-                st.success("更新しました。")
+                set_flash("success", "更新しました。")
                 st.rerun()
             if do_cancel:
                 st.session_state[edit_key] = False
@@ -182,7 +183,7 @@ for _, row in df_view.iterrows():
                 df_all = df_all[df_all["id"] != rid].reset_index(drop=True)
                 save("projects", df_all)
                 st.session_state[del_key] = False
-                st.success("削除しました。")
+                set_flash("success", "削除しました。")
                 st.rerun()
             if cc2.button("やめる", key=f"del_no_{rid}", use_container_width=True):
                 st.session_state[del_key] = False

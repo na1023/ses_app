@@ -77,8 +77,8 @@ SCHEMAS = {
     "daily": {
         "columns": ["id", "date", "company", "project_name", "attendance_type",
                     "start_time", "end_time", "break_time", "work_hours",
-                    "work_content", "remarks", "created_at"],
-        "dtypes":  {"id": str, "date": str, "company": str, "project_name": str,
+                    "late_early_time", "work_content", "remarks", "created_at"],
+        "dtypes":  {"id": str, "date": str, "company": str, "project_name": str, "late_early_time": str,
                     "attendance_type": str, "start_time": str, "end_time": str,
                     "break_time": str, "work_hours": float,
                     "work_content": str, "remarks": str, "created_at": str},

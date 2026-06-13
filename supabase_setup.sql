@@ -87,5 +87,6 @@
 
   -- 追加列（既存テーブルへの追加）
   alter table salary_records add column if not exists deduction_amount text default '0';
+  alter table daily_reports  add column if not exists late_early_time text default '0';
   alter table salary_records add column if not exists salary_type      text default '給与';
   alter table salary_records add column if not exists tax_adjustment   text default '0';

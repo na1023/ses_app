@@ -22,6 +22,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """
@@ -89,7 +90,7 @@ with tab_interview:
                     "memo":               memo,
                 }])], ignore_index=True)
                 save("interviews", df)
-                st.success("面談を登録しました。")
+                set_flash("success", "面談を登録しました。")
                 st.rerun()
 
     # 面談一覧
@@ -178,7 +179,7 @@ with tab_interview:
                         df_all.loc[m, "memo"]               = new_memo
                         save("interviews", df_all)
                         st.session_state[edit_key] = False
-                        st.success("更新しました。")
+                        set_flash("success", "更新しました。")
                         st.rerun()
                     if do_cancel:
                         st.session_state[edit_key] = False
@@ -193,7 +194,7 @@ with tab_interview:
                         df_all = df_all[df_all["id"] != rid].reset_index(drop=True)
                         save("interviews", df_all)
                         st.session_state[del_key] = False
-                        st.success("削除しました。")
+                        set_flash("success", "削除しました。")
                         st.rerun()
                     if cc2.button("やめる", key=f"iv_del_no_{rid}", use_container_width=True):
                         st.session_state[del_key] = False
@@ -235,7 +236,7 @@ with tab_todo:
                     "created_at":   dt.now().strftime("%Y-%m-%d %H:%M"),
                 }])], ignore_index=True)
                 save("todos", df_t)
-                st.success("ToDo を登録しました。")
+                set_flash("success", "ToDo を登録しました。")
                 st.rerun()
 
     # ToDo一覧
@@ -318,7 +319,7 @@ with tab_todo:
                         df_all.loc[m, "progress"]     = new_prog
                         save("todos", df_all)
                         st.session_state[edit_key] = False
-                        st.success("更新しました。")
+                        set_flash("success", "更新しました。")
                         st.rerun()
                     if do_cancel:
                         st.session_state[edit_key] = False
@@ -333,7 +334,7 @@ with tab_todo:
                         df_all = df_all[df_all["id"] != rid].reset_index(drop=True)
                         save("todos", df_all)
                         st.session_state[del_key] = False
-                        st.success("削除しました。")
+                        set_flash("success", "削除しました。")
                         st.rerun()
                     if cc2.button("やめる", key=f"td_del_no_{rid}", use_container_width=True):
                         st.session_state[del_key] = False

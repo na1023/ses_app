@@ -14,7 +14,7 @@ from utils.data_manager import (
     load, save, append_row, generate_id, init_all,
     get_company_list, get_project_list_by_company,
 )
-from utils.styles import THEME_CSS, render_sidebar
+from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
 
 st.set_page_config(page_title="日報管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -24,6 +24,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """
@@ -239,14 +240,19 @@ def jp_date_selector(key_prefix: str, default: date) -> str:
     return f"{sel_y}-{sel_m_int:02d}-{sel_d_int:02d}"
 
 
+LATE_EARLY_TYPES = {"遅刻", "早退", "遅刻+早退"}
+LATE_EARLY_LABEL = {"遅刻": "遅刻時間 (h)", "早退": "早退時間 (h)", "遅刻+早退": "遅刻+早退時間 (h)"}
+
 with st.expander("日報を入力する", expanded=True):
-    rc1, rc2, rc3 = st.columns([1, 1, 1])
+    show_flash()
+    rc1, rc2, rc3, rc4 = st.columns([1, 1, 1, 1])
     with rc1:
         st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>日付 *</div>", unsafe_allow_html=True)
         reg_date = jp_date_selector("reg_date", date.today())
     reg_company = rc2.selectbox("会社名 *", [""] + companies, key="reg_company")
     reg_projs   = get_project_list_by_company(reg_company) if reg_company else []
     reg_project = rc3.selectbox("案件名 *", [""] + reg_projs, key="reg_project")
+    reg_att     = rc4.selectbox("勤怠区分 *", ATTENDANCE_OPTIONS, key="reg_att")
 
     # 同日付の重複チェック
     dup_dates = set(df_all_daily["date"].tolist()) if not df_all_daily.empty else set()
@@ -254,10 +260,18 @@ with st.expander("日報を入力する", expanded=True):
         st.warning(f"{reg_date} の日報はすでに登録されています。内容を確認してから登録してください。")
 
     with st.form("daily_report_form", clear_on_submit=True):
-        attendance = st.selectbox("勤怠区分 *", ATTENDANCE_OPTIONS)
         st_s, st_e, st_b = time_inputs(key_prefix="reg")
         wh_prev = calc_work_hours(st_s, st_e, st_b)
-        st.info(f"実働時間（自動計算）: **{wh_prev:.2f} h**")
+        st.info(f"実働時間（自動計算）: **{wh_prev:.2f} h**　※稼働時間として集計されます")
+
+        late_early_h = 0.0
+        if reg_att in LATE_EARLY_TYPES:
+            late_early_h = st.number_input(
+                LATE_EARLY_LABEL[reg_att],
+                min_value=0.0, max_value=12.0, step=0.25, value=0.0,
+                key="reg_let",
+                help="遅刻・早退した時間を入力してください（例: 1.5 = 1時間30分）"
+            )
 
         work_content = st.text_area("業務内容 *", height=100,
                                     placeholder="本日行った作業・対応内容を記載してください")
@@ -275,26 +289,30 @@ with st.expander("日報を入力する", expanded=True):
             for e in errors: st.error(e)
         else:
             wh = calc_work_hours(st_s, st_e, st_b)
+            let = round(late_early_h, 2) if reg_att in LATE_EARLY_TYPES else 0.0
             append_row("daily", {
-                "id":              generate_id(),
-                "date":            reg_date,
-                "company":         reg_company,
-                "project_name":    reg_project,
-                "attendance_type": attendance,
-                "start_time":      st_s,
-                "end_time":        st_e,
-                "break_time":      st_b,
-                "work_hours":      round(wh, 2),
-                "work_content":    work_content.strip(),
-                "remarks":         remarks.strip(),
-                "created_at":      datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "id":               generate_id(),
+                "date":             reg_date,
+                "company":          reg_company,
+                "project_name":     reg_project,
+                "attendance_type":  reg_att,
+                "start_time":       st_s,
+                "end_time":         st_e,
+                "break_time":       st_b,
+                "work_hours":       round(wh, 2),
+                "late_early_time":  str(let),
+                "work_content":     work_content.strip(),
+                "remarks":          remarks.strip(),
+                "created_at":       datetime.now().strftime("%Y-%m-%d %H:%M"),
             })
-            st.success(f"{reg_date} の日報を登録しました。（実働 {wh:.2f}h）")
+            extra = f"　遅刻/早退 {let:.2f}h" if let > 0 else ""
+            set_flash("success", f"{reg_date} の日報を登録しました。（実働 {wh:.2f}h{extra}）")
             st.rerun()
 
 st.markdown("---")
 
 # ===== 日報一覧 =====
+show_flash()
 st.markdown("### 日報一覧")
 df = load("daily")
 
@@ -346,9 +364,16 @@ for _, row in df_view.iterrows():
                 f"<span style='color:{att_color}; font-size:0.82rem;'>{att_val}</span>",
                 unsafe_allow_html=True,
             )
+            let_val = row.get("late_early_time", "0")
+            try:
+                let_f = float(let_val)
+            except Exception:
+                let_f = 0.0
+            att_type = row.get("attendance_type", "")
+            let_disp = f"遅刻/早退 {let_f:.2f}h" if (let_f > 0 and att_type in LATE_EARLY_TYPES) else ""
             meta = "  |  ".join(x for x in [
                 f"{row.get('company','')} / {row.get('project_name','')}",
-                time_label, wh_disp,
+                time_label, wh_disp, let_disp,
             ] if x)
             st.caption(meta)
             content = str(row.get("work_content", ""))
@@ -379,17 +404,29 @@ for _, row in df_view.iterrows():
             proj_idx     = proj_opts.index(cur_proj) if cur_proj in proj_opts else 0
             edit_project = ec2.selectbox("案件名", proj_opts, index=proj_idx, key=f"ep_{rid}")
 
+            ef1, ef2 = st.columns(2)
+            new_date = ef1.text_input("日付 (YYYY-MM-DD)", value=row.get("date",""), key=f"edate_{rid}")
+            new_att  = ef2.selectbox("勤怠区分", ATTENDANCE_OPTIONS, index=att_idx, key=f"eatt_{rid}")
+
             with st.form(f"dr_edit_form_{rid}"):
-                ef1, ef2 = st.columns(2)
-                new_date = ef1.text_input("日付 (YYYY-MM-DD)", value=row.get("date",""))
-                new_att  = ef2.selectbox("勤怠区分", ATTENDANCE_OPTIONS, index=att_idx)
                 e_s, e_e, e_b = time_inputs(
                     default_start=row.get("start_time","09:00") or "09:00",
                     default_end  =row.get("end_time",  "18:00") or "18:00",
                     default_brk  =row.get("break_time","01:00") or "01:00",
                     key_prefix=f"edit_{rid}",
                 )
-                st.info(f"実働時間（自動計算）: **{calc_work_hours(e_s, e_e, e_b):.2f} h**")
+                st.info(f"実働時間（自動計算）: **{calc_work_hours(e_s, e_e, e_b):.2f} h**　※稼働時間として集計されます")
+                edit_late_h = 0.0
+                if new_att in LATE_EARLY_TYPES:
+                    try:
+                        cur_let = float(row.get("late_early_time", 0) or 0)
+                    except Exception:
+                        cur_let = 0.0
+                    edit_late_h = st.number_input(
+                        LATE_EARLY_LABEL[new_att],
+                        min_value=0.0, max_value=12.0, step=0.25, value=cur_let,
+                        key=f"elet_{rid}",
+                    )
                 new_content = st.text_area("業務内容", value=row.get("work_content",""), height=100)
                 new_remarks = st.text_area("備考",     value=row.get("remarks",     ""), height=60)
                 sc1, sc2 = st.columns(2)
@@ -398,6 +435,7 @@ for _, row in df_view.iterrows():
 
             if do_save:
                 new_wh = calc_work_hours(e_s, e_e, e_b)
+                new_let = round(edit_late_h, 2) if new_att in LATE_EARLY_TYPES else 0.0
                 df_all = load("daily")
                 m = df_all["id"] == rid
                 df_all.loc[m, "date"]            = new_date
@@ -408,11 +446,12 @@ for _, row in df_view.iterrows():
                 df_all.loc[m, "end_time"]        = e_e
                 df_all.loc[m, "break_time"]      = e_b
                 df_all.loc[m, "work_hours"]      = str(round(new_wh, 2))
+                df_all.loc[m, "late_early_time"] = str(new_let)
                 df_all.loc[m, "work_content"]    = new_content
                 df_all.loc[m, "remarks"]         = new_remarks
                 save("daily", df_all)
                 st.session_state[edit_key] = False
-                st.success("更新しました。")
+                set_flash("success", "更新しました。")
                 st.rerun()
             if do_cancel:
                 st.session_state[edit_key] = False
@@ -426,7 +465,7 @@ for _, row in df_view.iterrows():
                 df_all = df_all[df_all["id"] != rid].reset_index(drop=True)
                 save("daily", df_all)
                 st.session_state[del_key] = False
-                st.success("削除しました。")
+                set_flash("success", "削除しました。")
                 st.rerun()
             if cc2.button("やめる", key=f"dr_del_no_{rid}", use_container_width=True):
                 st.session_state[del_key] = False

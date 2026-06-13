@@ -14,7 +14,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, save, generate_id, init_all
-from utils.styles import THEME_CSS, render_sidebar
+from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
 
 st.set_page_config(page_title="給与管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -24,6 +24,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """
@@ -505,7 +506,7 @@ with tab_list:
                                 df_sal.loc[idx, "memo"] = new_memo
                                 save("salary", df_sal)
                             st.session_state[edit_key] = False
-                            st.success("更新しました。")
+                            set_flash("success", "更新しました。")
                             st.rerun()
                     else:
                         inc_vals, ded_vals, tax_adj, new_memo, upd = salary_form_fields(
@@ -523,7 +524,7 @@ with tab_list:
                                 df_sal.loc[idx, "memo"] = new_memo
                                 save("salary", df_sal)
                             st.session_state[edit_key] = False
-                            st.success("更新しました。")
+                            set_flash("success", "更新しました。")
                             st.rerun()
 
                 if st.session_state.get(del_key):
@@ -534,7 +535,7 @@ with tab_list:
                         df_sal = df_sal[df_sal["id"] != rid].reset_index(drop=True)
                         save("salary", df_sal)
                         st.session_state[del_key] = False
-                        st.success("削除しました。")
+                        set_flash("success", "削除しました。")
                         st.rerun()
                     if cc2.button("やめる", key=f"sal_del_no_{rid}"):
                         st.session_state[del_key] = False

@@ -15,7 +15,7 @@ from utils.data_manager import (
     DATA_DIR, BACKUP_DIR, PATHS, SCHEMAS,
     _use_supabase,
 )
-from utils.styles import THEME_CSS, render_sidebar
+from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
 
 st.set_page_config(page_title="設定・データ管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -25,6 +25,7 @@ if "initialized" not in st.session_state:
     st.session_state["initialized"] = True
 
 render_sidebar()
+show_flash()
 
 st.markdown(
     """
@@ -213,7 +214,7 @@ with tab_reset:
         if st.button("データを初期化する", key="reset_exec"):
             df_empty = pd.DataFrame(columns=SCHEMAS[target_reset]["columns"])
             save(target_reset, df_empty)
-            st.success(f"{KEY_LABELS[target_reset]} を初期化しました。")
+            set_flash("success", f"{KEY_LABELS[target_reset]} を初期化しました。")
             st.rerun()
 
 # ================================================================

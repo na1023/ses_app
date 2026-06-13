@@ -176,6 +176,20 @@ div[data-testid="stMetricValue"] {
 APP_VERSION = "1.2.0"
 
 
+def set_flash(kind: str, message: str) -> None:
+    """rerun 後に表示するメッセージをセッションに保存する。kind: success/error/warning/info"""
+    import streamlit as st
+    st.session_state["_flash"] = (kind, message)
+
+
+def show_flash() -> None:
+    """ページ先頭で呼び出してフラッシュメッセージを表示・クリアする"""
+    import streamlit as st
+    if "_flash" in st.session_state:
+        kind, msg = st.session_state.pop("_flash")
+        getattr(st, kind)(msg)
+
+
 def render_sidebar() -> None:
     """全ページ共通のサイドバーナビゲーションを描画する"""
     import streamlit as st
