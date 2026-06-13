@@ -274,40 +274,83 @@ with tab_list:
                 if ds["days"] > 0:
                     st.caption(f"日報参照　稼働 {ds['days']} 日 / {ds['hours']:.2f} h")
 
-                # --- KPI + 前月比・前年比 ---
+                # --- サマリーKPI ---
                 c1, c2, c3, c4 = st.columns(4)
                 c1.metric("総支給額",    f"¥{s['income_total']:,}")
                 c2.metric("課税対象収入", f"¥{s['taxable_income']:,}")
                 c3.metric("控除合計",    f"¥{s['deduction_total']:,}")
                 c4.metric("手取り",      f"¥{s['take_home']:,}")
 
-                # 前月比・前年比（手取りベース）
-                comp_cols = st.columns(2)
-                if prev_m_sum:
-                    d_label, d_color = delta_str(s["take_home"], prev_m_sum["take_home"])
-                    comp_cols[0].markdown(
-                        f"<span style='font-size:0.78rem;color:#64748b;'>前月比（手取り）</span><br>"
-                        f"<span style='font-size:0.92rem;font-weight:600;color:{d_color};'>{d_label}</span>",
-                        unsafe_allow_html=True,
-                    )
-                if prev_y_sum:
-                    d_label, d_color = delta_str(s["take_home"], prev_y_sum["take_home"])
-                    comp_cols[1].markdown(
-                        f"<span style='font-size:0.78rem;color:#64748b;'>前年同月比（手取り）</span><br>"
-                        f"<span style='font-size:0.92rem;font-weight:600;color:{d_color};'>{d_label}</span>",
-                        unsafe_allow_html=True,
-                    )
+                # --- 全項目比較テーブル ---
+                with st.expander("全項目の前月比・前年同月比"):
+                    prev_m_row  = df_prev_m.iloc[0].to_dict()  if not df_prev_m.empty  else {}
+                    prev_y_row  = df_prev_y.iloc[0].to_dict()  if not df_prev_y.empty  else {}
 
-                with st.expander("詳細を表示"):
-                    dc1, dc2 = st.columns(2)
-                    dc1.markdown("**支給項目**")
-                    for key, label in INCOME_FIELDS:
-                        v = to_int(row.get(key, 0))
-                        if v: dc1.caption(f"{label}：¥{v:,}")
-                    dc2.markdown("**控除項目**")
-                    for key, label in DEDUCTION_FIELDS:
-                        v = to_int(row.get(key, 0))
-                        if v: dc2.caption(f"{label}：¥{v:,}")
+                    def fmt_delta(cur, base):
+                        if base == 0:
+                            return "—", "#64748b"
+                        diff = cur - base
+                        pct  = diff / base * 100
+                        sign = "+" if diff >= 0 else ""
+                        color = "#10b981" if diff >= 0 else "#ef4444"
+                        return f"{sign}{pct:.1f}%", color
+
+                    # サマリー行を先頭に追加
+                    summary_rows = [
+                        ("【総支給額】",    s["income_total"],    to_int(prev_m_row.get("income_total",    0) if prev_m_row else 0), to_int(prev_y_row.get("income_total",    0) if prev_y_row else 0), True),
+                        ("【控除合計】",    s["deduction_total"], to_int(prev_m_row.get("deduction_total", 0) if prev_m_row else 0), to_int(prev_y_row.get("deduction_total", 0) if prev_y_row else 0), True),
+                        ("【手取り】",      s["take_home"],       to_int(prev_m_row.get("take_home",       0) if prev_m_row else 0), to_int(prev_y_row.get("take_home",       0) if prev_y_row else 0), True),
+                    ]
+                    # サマリー用の前月・前年計算
+                    pm_inc = sum(to_int(prev_m_row.get(k,0)) for k,_ in INCOME_FIELDS)   if prev_m_row else 0
+                    py_inc = sum(to_int(prev_y_row.get(k,0)) for k,_ in INCOME_FIELDS)   if prev_y_row else 0
+                    pm_ded = sum(to_int(prev_m_row.get(k,0)) for k,_ in DEDUCTION_FIELDS) if prev_m_row else 0
+                    py_ded = sum(to_int(prev_y_row.get(k,0)) for k,_ in DEDUCTION_FIELDS) if prev_y_row else 0
+                    summary_rows = [
+                        ("【総支給額】",  s["income_total"],    pm_inc,            py_inc,            True),
+                        ("【控除合計】",  s["deduction_total"], pm_ded,            py_ded,            True),
+                        ("【手取り】",    s["take_home"],       pm_inc - pm_ded,   py_inc - py_ded,   True),
+                    ]
+
+                    detail_rows = []
+                    for key, lbl in INCOME_FIELDS:
+                        cur = to_int(row.get(key, 0))
+                        pm  = to_int(prev_m_row.get(key, 0)) if prev_m_row else 0
+                        py  = to_int(prev_y_row.get(key, 0)) if prev_y_row else 0
+                        if cur or pm or py:
+                            detail_rows.append((f"　{lbl}", cur, pm, py, False))
+                    for key, lbl in DEDUCTION_FIELDS:
+                        cur = to_int(row.get(key, 0))
+                        pm  = to_int(prev_m_row.get(key, 0)) if prev_m_row else 0
+                        py  = to_int(prev_y_row.get(key, 0)) if prev_y_row else 0
+                        if cur or pm or py:
+                            detail_rows.append((f"　{lbl}", cur, pm, py, False))
+
+                    has_prev_m = bool(prev_m_row)
+                    has_prev_y = bool(prev_y_row)
+
+                    hdr_cols = ["項目", "今月", "前月", "前月比", "前年同月", "前年同月比"]
+                    rows_html = ""
+                    for lbl, cur, pm, py, is_bold in summary_rows + detail_rows:
+                        dm_txt, dm_col = fmt_delta(cur, pm) if has_prev_m else ("—", "#64748b")
+                        dy_txt, dy_col = fmt_delta(cur, py) if has_prev_y else ("—", "#64748b")
+                        fw = "700" if is_bold else "400"
+                        rows_html += (
+                            f"<tr>"
+                            f"<td style='font-weight:{fw}'>{lbl}</td>"
+                            f"<td style='text-align:right;font-weight:{fw}'>¥{cur:,}</td>"
+                            f"<td style='text-align:right;color:#64748b'>{'¥'+f'{pm:,}' if has_prev_m else '—'}</td>"
+                            f"<td style='text-align:right;color:{dm_col};font-weight:600'>{dm_txt}</td>"
+                            f"<td style='text-align:right;color:#64748b'>{'¥'+f'{py:,}' if has_prev_y else '—'}</td>"
+                            f"<td style='text-align:right;color:{dy_col};font-weight:600'>{dy_txt}</td>"
+                            f"</tr>"
+                        )
+                    st.markdown(
+                        f"""<div class="table-wrap"><table class="styled-table">
+                        <thead><tr>{''.join(f'<th>{h}</th>' for h in hdr_cols)}</tr></thead>
+                        <tbody>{rows_html}</tbody></table></div>""",
+                        unsafe_allow_html=True,
+                    )
                     if row.get("memo"):
                         st.caption(f"メモ：{row['memo']}")
 
