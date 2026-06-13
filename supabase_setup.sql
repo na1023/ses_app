@@ -84,3 +84,6 @@
   alter table todos          disable row level security;
   alter table daily_reports  disable row level security;
   alter table salary_records disable row level security;
+
+  -- 減額金列を追加（既存テーブルへの追加）
+  alter table salary_records add column if not exists deduction_amount text default '0';

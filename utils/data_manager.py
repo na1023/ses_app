@@ -60,6 +60,7 @@ SCHEMAS = {
             "transport_allowance", "overtime_pay",
             "health_insurance", "nursing_insurance", "pension",
             "employment_insurance", "income_tax", "resident_tax",
+            "deduction_amount",
             "memo", "created_at",
         ],
         "dtypes": {k: str for k in [
@@ -69,6 +70,7 @@ SCHEMAS = {
             "transport_allowance", "overtime_pay",
             "health_insurance", "nursing_insurance", "pension",
             "employment_insurance", "income_tax", "resident_tax",
+            "deduction_amount",
             "memo", "created_at",
         ]},
     },
