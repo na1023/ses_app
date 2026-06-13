@@ -130,12 +130,16 @@ with left:
         recent = df_daily.sort_values("date", ascending=False).head(5)
         rows = ""
         for _, r in recent.iterrows():
+            try:
+                wh = f"{float(r.get('work_hours', 0)):.2f}"
+            except (ValueError, TypeError):
+                wh = r.get('work_hours', '')
             rows += f"""
             <tr>
                 <td>{r.get('date','')}</td>
                 <td>{r.get('company','')}</td>
                 <td>{r.get('attendance_type','')}</td>
-                <td>{r.get('work_hours','')}</td>
+                <td>{wh}</td>
             </tr>"""
         st.markdown(
             f"""
