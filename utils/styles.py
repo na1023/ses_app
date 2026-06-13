@@ -200,6 +200,8 @@ def render_sidebar() -> None:
         st.page_link("pages/3_日報管理.py",        label="日報管理")
         st.page_link("pages/4_レポート.py",         label="レポート")
         st.page_link("pages/5_設定_データ管理.py", label="設定・データ管理")
+        st.page_link("pages/6_給与管理.py",        label="給与管理")
+        st.page_link("pages/7_職務経歴生成.py",    label="職務経歴生成")
         st.markdown("---")
         if st.session_state.get("backup_path"):
             st.caption("自動バックアップ完了")

@@ -80,7 +80,7 @@ with col1:
         f"""
         <div class="kpi-card">
             <div class="kpi-label">今月の稼働時間</div>
-            <div class="kpi-value">{monthly_hours:.1f}<span class="kpi-unit">h</span></div>
+            <div class="kpi-value">{monthly_hours:.2f}<span class="kpi-unit">h</span></div>
         </div>
         """,
         unsafe_allow_html=True,

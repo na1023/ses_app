@@ -104,7 +104,7 @@ with tab_monthly:
         .reset_index()
         .rename(columns={"attendance_type":"勤怠区分"})
     )
-    att_summary["合計時間(h)"] = att_summary["合計時間(h)"].map(lambda x: f"{x:.1f}")
+    att_summary["合計時間(h)"] = att_summary["合計時間(h)"].map(lambda x: f"{x:.2f}")
     st.dataframe(att_summary, use_container_width=True, hide_index=True)
 
     st.markdown("#### 業務内容まとめ")

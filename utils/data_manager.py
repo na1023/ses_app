@@ -20,6 +20,7 @@ _TABLE_MAP = {
     "interviews": "interviews",
     "todos":      "todos",
     "daily":      "daily_reports",
+    "salary":     "salary_records",
 }
 
 PATHS = {
@@ -27,6 +28,7 @@ PATHS = {
     "interviews": os.path.join(DATA_DIR, "interviews.csv"),
     "todos":      os.path.join(DATA_DIR, "todos.csv"),
     "daily":      os.path.join(DATA_DIR, "daily_reports.csv"),
+    "salary":     os.path.join(DATA_DIR, "salary_records.csv"),
 }
 
 # ---- スキーマ定義 ----
@@ -49,6 +51,26 @@ SCHEMAS = {
         "dtypes":  {"id": str, "company": str, "project_name": str,
                     "task": str, "due_date": str, "progress": str,
                     "created_at": str},
+    },
+    "salary": {
+        "columns": [
+            "id", "year_month", "company",
+            "basic_salary", "skill_allowance", "qualification_allowance",
+            "commute_allowance", "expense_reimbursement", "other_expense",
+            "transport_allowance", "overtime_pay",
+            "health_insurance", "nursing_insurance", "pension",
+            "employment_insurance", "income_tax", "resident_tax",
+            "memo", "created_at",
+        ],
+        "dtypes": {k: str for k in [
+            "id", "year_month", "company",
+            "basic_salary", "skill_allowance", "qualification_allowance",
+            "commute_allowance", "expense_reimbursement", "other_expense",
+            "transport_allowance", "overtime_pay",
+            "health_insurance", "nursing_insurance", "pension",
+            "employment_insurance", "income_tax", "resident_tax",
+            "memo", "created_at",
+        ]},
     },
     "daily": {
         "columns": ["id", "date", "company", "project_name", "attendance_type",
