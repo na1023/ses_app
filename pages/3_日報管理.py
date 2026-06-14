@@ -259,6 +259,8 @@ def jp_date_selector(key_prefix: str, default: date) -> str:
 
 LATE_EARLY_TYPES = {"遅刻", "早退", "遅刻+早退"}
 LATE_EARLY_LABEL = {"遅刻": "遅刻時間 (h)", "早退": "早退時間 (h)", "遅刻+早退": "遅刻+早退時間 (h)"}
+# 勤務系（時刻・業務内容を入力する区分）。これ以外（有給・欠勤・休日等）は備考のみで登録可。
+WORK_TYPES = {"出社", "在宅", "出社+在宅", "遅刻", "早退", "遅刻+早退"}
 
 with st.expander("日報を入力する", expanded=True):
     show_flash()
@@ -279,36 +281,45 @@ with st.expander("日報を入力する", expanded=True):
     if reg_date and reg_date in dup_dates:
         st.warning(f"{reg_date} の日報はすでに登録されています。内容を確認してから登録してください。")
 
+    is_work = reg_att in WORK_TYPES
+
     with st.form("daily_report_form", clear_on_submit=True):
-        st_s, st_e, st_b = time_inputs(key_prefix="reg")
-        wh_prev = calc_work_hours(st_s, st_e, st_b)
-        st.info(f"実働時間（自動計算）: **{wh_prev:.2f} h**　※稼働時間として集計されます")
+        if is_work:
+            st_s, st_e, st_b = time_inputs(key_prefix="reg")
+            wh_prev = calc_work_hours(st_s, st_e, st_b)
+            st.info(f"実働時間（自動計算）: **{wh_prev:.2f} h**　※稼働時間として集計されます")
 
-        late_early_h = 0.0
-        if reg_att in LATE_EARLY_TYPES:
-            late_early_h = st.number_input(
-                LATE_EARLY_LABEL[reg_att],
-                min_value=0.0, max_value=12.0, step=0.25, value=0.0,
-                key="reg_let",
-                help="遅刻・早退した時間を入力してください（例: 1.5 = 1時間30分）"
-            )
+            late_early_h = 0.0
+            if reg_att in LATE_EARLY_TYPES:
+                late_early_h = st.number_input(
+                    LATE_EARLY_LABEL[reg_att],
+                    min_value=0.0, max_value=12.0, step=0.25, value=0.0,
+                    key="reg_let",
+                    help="遅刻・早退した時間を入力してください（例: 1.5 = 1時間30分）"
+                )
 
-        work_content = st.text_area("業務内容 *", height=100,
-                                    placeholder="本日行った作業・対応内容を記載してください")
+            work_content = st.text_area("業務内容 *", height=100,
+                                        placeholder="本日行った作業・対応内容を記載してください")
+        else:
+            st.caption(f"「{reg_att}」は時刻・業務内容の入力は不要です。必要に応じて備考のみ入力してください。")
+            st_s = st_e = st_b = ""
+            late_early_h = 0.0
+            work_content = ""
+
         remarks      = st.text_area("備考", height=60,
                                     placeholder="特記事項・翌日の予定など")
         submitted = st.form_submit_button("日報を登録する", use_container_width=True)
 
     if submitted:
         errors = []
-        if not reg_company:          errors.append("会社名を選択してください。")
-        if not reg_project:          errors.append("案件名を選択してください。")
-        if not work_content.strip(): errors.append("業務内容を入力してください。")
+        if is_work and not reg_company:          errors.append("会社名を選択してください。")
+        if is_work and not reg_project:          errors.append("案件名を選択してください。")
+        if is_work and not work_content.strip(): errors.append("業務内容を入力してください。")
 
         if errors:
             for e in errors: st.error(e)
         else:
-            wh = calc_work_hours(st_s, st_e, st_b)
+            wh = calc_work_hours(st_s, st_e, st_b) if is_work else 0.0
             let = round(late_early_h, 2) if reg_att in LATE_EARLY_TYPES else 0.0
             append_row("daily", {
                 "id":               generate_id(),
@@ -430,33 +441,41 @@ for _, row in df_view.iterrows():
             new_date = ef1.text_input("日付 (YYYY-MM-DD)", value=row.get("date",""), key=f"edate_{rid}")
             new_att  = ef2.selectbox("勤怠区分", ATTENDANCE_OPTIONS, index=att_idx, key=f"eatt_{rid}")
 
+            edit_is_work = new_att in WORK_TYPES
+
             with st.form(f"dr_edit_form_{rid}"):
-                e_s, e_e, e_b = time_inputs(
-                    default_start=row.get("start_time","09:00") or "09:00",
-                    default_end  =row.get("end_time",  "18:00") or "18:00",
-                    default_brk  =row.get("break_time","01:00") or "01:00",
-                    key_prefix=f"edit_{rid}",
-                )
-                st.info(f"実働時間（自動計算）: **{calc_work_hours(e_s, e_e, e_b):.2f} h**　※稼働時間として集計されます")
-                edit_late_h = 0.0
-                if new_att in LATE_EARLY_TYPES:
-                    try:
-                        cur_let = float(row.get("late_early_time", 0) or 0)
-                    except Exception:
-                        cur_let = 0.0
-                    edit_late_h = st.number_input(
-                        LATE_EARLY_LABEL[new_att],
-                        min_value=0.0, max_value=12.0, step=0.25, value=cur_let,
-                        key=f"elet_{rid}",
+                if edit_is_work:
+                    e_s, e_e, e_b = time_inputs(
+                        default_start=row.get("start_time","09:00") or "09:00",
+                        default_end  =row.get("end_time",  "18:00") or "18:00",
+                        default_brk  =row.get("break_time","01:00") or "01:00",
+                        key_prefix=f"edit_{rid}",
                     )
-                new_content = st.text_area("業務内容", value=row.get("work_content",""), height=100)
+                    st.info(f"実働時間（自動計算）: **{calc_work_hours(e_s, e_e, e_b):.2f} h**　※稼働時間として集計されます")
+                    edit_late_h = 0.0
+                    if new_att in LATE_EARLY_TYPES:
+                        try:
+                            cur_let = float(row.get("late_early_time", 0) or 0)
+                        except Exception:
+                            cur_let = 0.0
+                        edit_late_h = st.number_input(
+                            LATE_EARLY_LABEL[new_att],
+                            min_value=0.0, max_value=12.0, step=0.25, value=cur_let,
+                            key=f"elet_{rid}",
+                        )
+                    new_content = st.text_area("業務内容", value=row.get("work_content",""), height=100)
+                else:
+                    st.caption(f"「{new_att}」は時刻・業務内容の入力は不要です。必要に応じて備考のみ入力してください。")
+                    e_s = e_e = e_b = ""
+                    edit_late_h = 0.0
+                    new_content = ""
                 new_remarks = st.text_area("備考",     value=row.get("remarks",     ""), height=60)
                 sc1, sc2 = st.columns(2)
                 do_save   = sc1.form_submit_button("保存する",   use_container_width=True)
                 do_cancel = sc2.form_submit_button("キャンセル", use_container_width=True)
 
             if do_save:
-                new_wh = calc_work_hours(e_s, e_e, e_b)
+                new_wh = calc_work_hours(e_s, e_e, e_b) if edit_is_work else 0.0
                 new_let = round(edit_late_h, 2) if new_att in LATE_EARLY_TYPES else 0.0
                 df_all = load("daily")
                 m = df_all["id"] == rid
