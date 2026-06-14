@@ -56,6 +56,7 @@ KEY_LABELS = {
     "todos":      "ToDo データ",
     "daily":      "日報データ",
     "salary":     "給与データ",
+    "leave":      "有給付与データ",
 }
 
 tab_check, tab_export, tab_import, tab_backup, tab_reset, tab_supabase = st.tabs(

@@ -212,6 +212,7 @@ def render_sidebar() -> None:
         st.page_link("pages/1_案件管理.py",        label="案件管理")
         st.page_link("pages/2_面談_ToDo管理.py",   label="面談・ToDo管理")
         st.page_link("pages/3_日報管理.py",        label="日報管理")
+        st.page_link("pages/8_勤怠_有給管理.py",   label="有給・残業管理")
         st.page_link("pages/6_給与管理.py",        label="給与管理")
         st.page_link("pages/7_職務経歴生成.py",    label="職務経歴生成")
         st.page_link("pages/4_レポート.py",         label="レポート")

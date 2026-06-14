@@ -90,3 +90,13 @@
   alter table daily_reports  add column if not exists late_early_time text default '0';
   alter table salary_records add column if not exists salary_type      text default '給与';
   alter table salary_records add column if not exists tax_adjustment   text default '0';
+
+  -- 有給付与
+  create table if not exists leave_grants (
+    id          text primary key,
+    grant_date  text default '',
+    days        text default '0',
+    memo        text default '',
+    created_at  text default ''
+  );
+  alter table leave_grants disable row level security;

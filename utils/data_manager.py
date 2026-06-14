@@ -21,6 +21,7 @@ _TABLE_MAP = {
     "todos":      "todos",
     "daily":      "daily_reports",
     "salary":     "salary_records",
+    "leave":      "leave_grants",
 }
 
 PATHS = {
@@ -29,6 +30,7 @@ PATHS = {
     "todos":      os.path.join(DATA_DIR, "todos.csv"),
     "daily":      os.path.join(DATA_DIR, "daily_reports.csv"),
     "salary":     os.path.join(DATA_DIR, "salary_records.csv"),
+    "leave":      os.path.join(DATA_DIR, "leave_grants.csv"),
 }
 
 # ---- スキーマ定義 ----
@@ -82,6 +84,10 @@ SCHEMAS = {
                     "attendance_type": str, "start_time": str, "end_time": str,
                     "break_time": str, "work_hours": float,
                     "work_content": str, "remarks": str, "created_at": str},
+    },
+    "leave": {
+        "columns": ["id", "grant_date", "days", "memo", "created_at"],
+        "dtypes":  {"id": str, "grant_date": str, "days": str, "memo": str, "created_at": str},
     },
 }
 
