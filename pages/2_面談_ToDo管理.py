@@ -12,7 +12,7 @@ from utils.data_manager import (
     load, save, generate_id, init_all,
     get_company_list, get_project_list_by_company, get_project_options,
 )
-from utils.styles import THEME_CSS, status_badge, render_sidebar
+from utils.styles import THEME_CSS, status_badge, render_sidebar, set_flash, show_flash
 
 st.set_page_config(page_title="面談・ToDo管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
