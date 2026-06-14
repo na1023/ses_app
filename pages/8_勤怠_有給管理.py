@@ -54,7 +54,7 @@ def _num(v, default=0.0):
         return default
 
 
-def consumed_leave_days(df_daily: pd.DataFrame) -> tuple[float, pd.DataFrame]:
+def consumed_leavegdays(df_daily: pd.DataFrame) -> tuple[float, pd.DataFrame]:
     """日報から有給消化日数を集計し、(合計, 明細df) を返す"""
     if df_daily.empty or "attendance_type" not in df_daily.columns:
         return 0.0, pd.DataFrame(columns=["date", "attendance_type", "日数"])
@@ -84,17 +84,17 @@ with tab_leave:
         g_date = jp_date_selector("leave_grant_date", default=date(today.year, today.month, 1), year_back=5, year_fwd=1)
         with st.form("add_leave_form", clear_on_submit=True):
             gc1, gc2 = st.columns(2)
-            g_days = gc1.number_input("付与日数", min_value=0.0, max_value=40.0, step=0.5, value=10.0)
+            ggdays = gc1.number_input("付与日数", min_value=0.0, max_value=40.0, step=0.5, value=10.0)
             g_memo = gc2.text_input("メモ", placeholder="例: 入社1年付与")
             add = st.form_submit_button("付与を登録する", use_container_width=True)
         if add:
             df_grants = pd.concat([df_grants, pd.DataFrame([{
                 "id": generate_id(), "grant_date": g_date,
-                "days": str(g_days), "memo": g_memo,
+                "days": str(ggdays), "memo": g_memo,
                 "created_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
             }])], ignore_index=True)
             save("leave", df_grants)
-            set_flash("success", f"{g_date} に {g_days} 日を付与登録しました。")
+            set_flash("success", f"{g_date} に {ggdays} 日を付与登録しました。")
             st.rerun()
 
     if df_grants.empty:
@@ -102,20 +102,20 @@ with tab_leave:
     else:
         # 有効/失効の判定
         df_g = df_grants.copy()
-        df_g["_gdate"] = pd.to_datetime(df_g["grant_date"], errors="coerce")
-        df_g["_days"]  = df_g["days"].apply(_num)
-        df_g = df_g.dropna(subset=["_gdate"])
-        df_g["_expire"] = df_g["_gdate"] + pd.DateOffset(years=LEAVE_VALID_YEARS)
-        df_g["_valid"]  = df_g["_expire"].dt.date > today
+        df_g["gdt"] = pd.to_datetime(df_g["grant_date"], errors="coerce")
+        df_g["gdays"]  = df_g["days"].apply(_num)
+        df_g = df_g.dropna(subset=["gdt"])
+        df_g["gexpire"] = df_g["gdt"] + pd.DateOffset(years=LEAVE_VALID_YEARS)
+        df_g["gvalid"]  = df_g["gexpire"].dt.date > today
 
-        granted_valid = df_g[df_g["_valid"]]["_days"].sum()
-        granted_all   = df_g["_days"].sum()
-        consumed, df_consume = consumed_leave_days(df_daily)
-        remaining = granted_valid - consumed
+        grantedgvalid = df_g[df_g["gvalid"]]["gdays"].sum()
+        granted_all   = df_g["gdays"].sum()
+        consumed, df_consume = consumed_leavegdays(df_daily)
+        remaining = grantedgvalid - consumed
 
         # --- サマリー ---
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("有効付与（合計）", f"{granted_valid:.1f} 日")
+        c1.metric("有効付与（合計）", f"{grantedgvalid:.1f} 日")
         c2.metric("消化済み",       f"{consumed:.1f} 日")
         rem_color = "normal" if remaining > 5 else "inverse"
         c3.metric("残日数",         f"{remaining:.1f} 日")
@@ -127,29 +127,29 @@ with tab_leave:
             st.warning(f"残り {remaining:.1f} 日です。計画的に取得しましょう。")
 
         # --- 失効予定アラート ---
-        soon = df_g[df_g["_valid"]].copy()
-        soon["_days_to_expire"] = (soon["_expire"].dt.date.apply(lambda d: (d - today).days))
-        soon_warn = soon[soon["_days_to_expire"] <= 120].sort_values("_days_to_expire")
+        soon = df_g[df_g["gvalid"]].copy()
+        soon["gdays_to_exp"] = (soon["gexpire"].dt.date.apply(lambda d: (d - today).days))
+        soon_warn = soon[soon["gdays_to_exp"] <= 120].sort_values("gdays_to_exp")
         if not soon_warn.empty:
             st.markdown("##### 失効が近い付与")
             for r in soon_warn.itertuples():
-                exp = r._expire.date()
+                exp = r.gexpire.date()
                 st.warning(
-                    f"{r.grant_date} 付与の {r._days:.1f}日 は **{exp.strftime('%Y/%m/%d')}** に失効予定"
-                    f"（あと {r._days_to_expire} 日）"
+                    f"{r.grant_date} 付与の {r.gdays:.1f}日 は **{exp.strftime('%Y/%m/%d')}** に失効予定"
+                    f"（あと {r.gdays_to_exp} 日）"
                 )
 
         # --- 付与履歴 ---
         with st.expander("付与履歴・消化明細"):
             st.markdown("**付与履歴**")
-            show_g = df_g.sort_values("_gdate", ascending=False)
+            show_g = df_g.sort_values("gdt", ascending=False)
             rows = ""
             for r in show_g.itertuples():
-                status = "有効" if r._valid else "失効"
-                color  = "#10b981" if r._valid else "#64748b"
+                status = "有効" if r.gvalid else "失効"
+                color  = "#10b981" if r.gvalid else "#64748b"
                 rows += (
-                    f"<tr><td>{r.grant_date}</td><td style='text-align:right'>{r._days:.1f} 日</td>"
-                    f"<td>{r._expire.date().strftime('%Y/%m/%d')}</td>"
+                    f"<tr><td>{r.grant_date}</td><td style='text-align:right'>{r.gdays:.1f} 日</td>"
+                    f"<td>{r.gexpire.date().strftime('%Y/%m/%d')}</td>"
                     f"<td style='color:{color}'>{status}</td><td>{r.memo}</td>"
                     f"<td><code>{r.id[:8]}</code></td></tr>"
                 )
@@ -163,7 +163,7 @@ with tab_leave:
             del_id = st.selectbox(
                 "付与を削除", ["—"] + df_g["id"].tolist(),
                 format_func=lambda x: "—" if x == "—" else
-                    f"{df_g[df_g['id']==x]['grant_date'].iloc[0]} / {df_g[df_g['id']==x]['_days'].iloc[0]:.1f}日",
+                    f"{df_g[df_g['id']==x]['grant_date'].iloc[0]} / {df_g[df_g['id']==x]['gdays'].iloc[0]:.1f}日",
                 key="leave_del_sel",
             )
             if del_id != "—" and st.button("選択した付与を削除", key="leave_del_btn"):
