@@ -207,7 +207,12 @@ with tab_ot:
     df["_ym"] = df["_date"].dt.strftime("%Y-%m")
     df["_year"] = df["_date"].dt.strftime("%Y")
 
-    years = sorted(df["_year"].unique().tolist(), reverse=True)
+    # データの最古年〜今年までを連続生成（データが無い年も選べるよう自動更新）
+    this_year = date.today().year
+    data_years = [int(y) for y in df["_year"].dropna().unique().tolist()]
+    min_year = min(data_years) if data_years else this_year
+    max_year = max([this_year] + data_years)
+    years = [str(y) for y in range(max_year, min_year - 1, -1)]
     sel_year = persist_selectbox("対象年", years, "ot_year", format_func=lambda y: f"{y}年")
     df_y = df[df["_year"] == sel_year]
 
