@@ -151,6 +151,109 @@ div[data-testid="stMetricValue"] {
     border-radius: 6px;
 }
 
+/* ===== パーソナルコントロールセンター ===== */
+.transit-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #161b27;
+    border: 1px solid #1e2a3a;
+    border-radius: 12px;
+    padding: 1rem 0.5rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none !important;
+    gap: 0.35rem;
+    min-height: 80px;
+}
+.transit-btn:hover {
+    background: #1e2a3a;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+}
+.transit-icon { font-size: 1.6rem; line-height: 1; }
+.transit-label { font-size: 0.78rem; font-weight: 600; color: #c8d6e5; text-align: center; }
+.transit-sub   { font-size: 0.65rem; color: #64748b; text-align: center; }
+
+.badge-income  { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.badge-expense { background: #2d0707; color: #f87171; border: 1px solid #7f1d1d; }
+.badge-acquired { background: #052e16; color: #4ade80; border: 1px solid #166534; }
+.badge-studying { background: #0c1a2e; color: #60a5fa; border: 1px solid #1e40af; }
+.badge-planned  { background: #1c1400; color: #fbbf24; border: 1px solid #78350f; }
+.badge-expired  { background: #2d0707; color: #f87171; border: 1px solid #7f1d1d; }
+
+.alert-card {
+    background: #1c0f00;
+    border: 1px solid #78350f;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.alert-card.urgent { background: #1a0000; border-color: #7f1d1d; }
+.alert-icon  { font-size: 1.1rem; }
+.alert-body  { flex: 1; }
+.alert-title { font-size: 0.88rem; font-weight: 600; color: #e2e8f0; }
+.alert-sub   { font-size: 0.75rem; color: #94a3b8; margin-top: 0.1rem; }
+.alert-days  { font-size: 0.72rem; font-weight: 700; color: #fbbf24; white-space: nowrap; }
+.alert-days.urgent { color: #f87171; }
+
+.event-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.6rem 0;
+    border-bottom: 1px solid #1e2a3a;
+}
+.event-item:last-child { border-bottom: none; }
+.event-date-tag {
+    background: #0c1a2e;
+    border: 1px solid #1e40af;
+    border-radius: 6px;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #60a5fa;
+    white-space: nowrap;
+    min-width: 60px;
+    text-align: center;
+}
+.event-date-tag.today { background: #1e3a5f; border-color: #3b82f6; color: #93c5fd; }
+.event-title { font-size: 0.85rem; color: #e2e8f0; font-weight: 500; }
+.event-time  { font-size: 0.72rem; color: #64748b; }
+
+.kakeibo-summary { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.ks-block {
+    flex: 1;
+    min-width: 110px;
+    background: #161b27;
+    border: 1px solid #1e2a3a;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+}
+.ks-label   { font-size: 0.7rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+.ks-value   { font-size: 1.35rem; font-weight: 800; margin-top: 0.15rem; }
+.ks-income  { color: #4ade80; }
+.ks-expense { color: #f87171; }
+.ks-balance { color: #60a5fa; }
+
+.cat-bar-wrap  { margin: 0.4rem 0; }
+.cat-bar-label { font-size: 0.75rem; color: #94a3b8; display: flex; justify-content: space-between; }
+.cat-bar-track { background: #1e2a3a; border-radius: 4px; height: 6px; margin-top: 0.2rem; }
+.cat-bar-fill  { background: #3b82f6; border-radius: 4px; height: 6px; }
+.cat-bar-fill.income { background: #4ade80; }
+
+.quick-form-card {
+    background: #0c1a2e;
+    border: 1px solid #1e40af;
+    border-radius: 12px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+
 /* ===== レスポンシブ (スマホ) ===== */
 @media (max-width: 768px) {
     .main .block-container {
@@ -164,10 +267,10 @@ div[data-testid="stMetricValue"] {
     .section-card   { padding: 0.9rem; }
     .styled-table   { font-size: 0.78rem; }
     .styled-table th, .styled-table td { padding: 0.5rem 0.5rem; }
-    /* フォーム列をスマホで縦積み */
     div[data-testid="column"] { min-width: 0; }
-    /* タッチしやすいボタン */
     .stButton > button { min-height: 3rem; font-size: 1rem; }
+    .ks-value { font-size: 1.1rem; }
+    .transit-label { font-size: 0.72rem; }
     }
 </style>
 """
@@ -217,7 +320,19 @@ def render_sidebar() -> None:
         st.page_link("pages/7_職務経歴生成.py",    label="職務経歴生成")
         st.page_link("pages/4_レポート.py",         label="レポート")
         st.page_link("pages/5_設定_データ管理.py", label="設定・データ管理")
-        
+
+        st.markdown("---")
+        st.markdown(
+            "<div style='font-size:0.75rem; color:#64748b; padding: 0 0.25rem; "
+            "margin-bottom:0.25rem;'>パーソナル</div>",
+            unsafe_allow_html=True,
+        )
+        st.page_link("pages/9_コントロールセンター.py",  label="コントロールセンター")
+        st.page_link("pages/10_家計簿.py",               label="家計簿")
+        st.page_link("pages/11_カレンダー.py",            label="カレンダー")
+        st.page_link("pages/12_資格管理.py",              label="資格管理")
+        st.page_link("pages/13_運行情報.py",              label="運行情報")
+
         st.markdown("---")
         if st.session_state.get("backup_path"):
             st.caption("自動バックアップ完了")

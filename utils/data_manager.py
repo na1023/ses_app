@@ -16,21 +16,29 @@ BACKUP_DIR = os.path.join(BASE_DIR, "backup")
 
 # Supabase テーブル名マッピング
 _TABLE_MAP = {
-    "projects":   "projects",
-    "interviews": "interviews",
-    "todos":      "todos",
-    "daily":      "daily_reports",
-    "salary":     "salary_records",
-    "leave":      "leave_grants",
+    "projects":          "projects",
+    "interviews":        "interviews",
+    "todos":             "todos",
+    "daily":             "daily_reports",
+    "salary":            "salary_records",
+    "leave":             "leave_grants",
+    "kakeibo":           "kakeibo",
+    "calendar_events":   "calendar_events",
+    "qualifications":    "qualifications",
+    "transit_shortcuts": "transit_shortcuts",
 }
 
 PATHS = {
-    "projects":   os.path.join(DATA_DIR, "projects.csv"),
-    "interviews": os.path.join(DATA_DIR, "interviews.csv"),
-    "todos":      os.path.join(DATA_DIR, "todos.csv"),
-    "daily":      os.path.join(DATA_DIR, "daily_reports.csv"),
-    "salary":     os.path.join(DATA_DIR, "salary_records.csv"),
-    "leave":      os.path.join(DATA_DIR, "leave_grants.csv"),
+    "projects":          os.path.join(DATA_DIR, "projects.csv"),
+    "interviews":        os.path.join(DATA_DIR, "interviews.csv"),
+    "todos":             os.path.join(DATA_DIR, "todos.csv"),
+    "daily":             os.path.join(DATA_DIR, "daily_reports.csv"),
+    "salary":            os.path.join(DATA_DIR, "salary_records.csv"),
+    "leave":             os.path.join(DATA_DIR, "leave_grants.csv"),
+    "kakeibo":           os.path.join(DATA_DIR, "kakeibo.csv"),
+    "calendar_events":   os.path.join(DATA_DIR, "calendar_events.csv"),
+    "qualifications":    os.path.join(DATA_DIR, "qualifications.csv"),
+    "transit_shortcuts": os.path.join(DATA_DIR, "transit_shortcuts.csv"),
 }
 
 # ---- スキーマ定義 ----
@@ -88,6 +96,29 @@ SCHEMAS = {
     "leave": {
         "columns": ["id", "grant_date", "days", "memo", "created_at"],
         "dtypes":  {"id": str, "grant_date": str, "days": str, "memo": str, "created_at": str},
+    },
+    # ===== パーソナルコントロールセンター =====
+    "kakeibo": {
+        "columns": ["id", "date", "type", "category", "amount", "memo", "created_at"],
+        "dtypes":  {"id": str, "date": str, "type": str, "category": str,
+                    "amount": str, "memo": str, "created_at": str},
+    },
+    "calendar_events": {
+        "columns": ["id", "title", "date", "start_time", "end_time", "category", "memo", "created_at"],
+        "dtypes":  {"id": str, "title": str, "date": str, "start_time": str,
+                    "end_time": str, "category": str, "memo": str, "created_at": str},
+    },
+    "qualifications": {
+        "columns": ["id", "name", "category", "exam_date", "expiry_date",
+                    "status", "score", "cert_number", "memo", "created_at"],
+        "dtypes":  {"id": str, "name": str, "category": str, "exam_date": str,
+                    "expiry_date": str, "status": str, "score": str,
+                    "cert_number": str, "memo": str, "created_at": str},
+    },
+    "transit_shortcuts": {
+        "columns": ["id", "label", "station_name", "line_name", "url", "icon", "display_order"],
+        "dtypes":  {"id": str, "label": str, "station_name": str, "line_name": str,
+                    "url": str, "icon": str, "display_order": str},
     },
 }
 
