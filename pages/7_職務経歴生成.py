@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, init_all, get_company_list
 from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
+from utils.ui import jp_date_selector, persist_selectbox
 from utils.summarizer import extract_period, generate_career_markdown, generate_career_text
 
 st.set_page_config(page_title="職務経歴生成 | SES業務管理", layout="wide")
@@ -41,15 +42,17 @@ if df_daily.empty:
 
 # ---- 設定パネル ----
 st.markdown("### 抽出条件")
-col1, col2, col3 = st.columns(3)
-
-# 日付範囲（テキスト入力）
-start_str = col1.text_input("開始日 (YYYY-MM-DD)", value=(date.today().replace(day=1) - timedelta(days=90)).strftime("%Y-%m-%d"))
-end_str   = col2.text_input("終了日 (YYYY-MM-DD)", value=date.today().strftime("%Y-%m-%d"))
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>開始日</div>", unsafe_allow_html=True)
+    start_str = jp_date_selector("career_start", default=(date.today().replace(day=1) - timedelta(days=90)))
+with col2:
+    st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>終了日</div>", unsafe_allow_html=True)
+    end_str = jp_date_selector("career_end", default=date.today())
 
 # 案件フィルター
 companies = ["すべて"] + get_company_list()
-sel_company = col3.selectbox("会社名で絞り込み", companies, key="career_company")
+sel_company = persist_selectbox("会社名で絞り込み", companies, "career_company")
 
 max_tech = st.slider("抽出する技術キーワードの上限", 3, 20, 10)
 

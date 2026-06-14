@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, init_all
 from utils.styles import THEME_CSS, render_sidebar
+from utils.ui import persist_selectbox
 
 st.set_page_config(page_title="レポート | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -82,7 +83,7 @@ tab_monthly, tab_weekly, tab_chart = st.tabs(["月報", "週報", "グラフ"])
 # 月報タブ
 # ================================================================
 with tab_monthly:
-    sel_month = st.selectbox("対象月を選択", list(reversed(all_months)), key="rep_month")
+    sel_month = persist_selectbox("対象月を選択", list(reversed(all_months)), "rep_month")
     df_m = df_raw[df_raw["year_month"] == sel_month]
 
     col1, col2, col3, col4 = st.columns(4)
@@ -146,7 +147,7 @@ with tab_monthly:
 # ================================================================
 with tab_weekly:
     week_list = sorted(df_raw["year_week"].unique().tolist(), reverse=True)
-    sel_week  = st.selectbox("対象週を選択", week_list, key="rep_week")
+    sel_week  = persist_selectbox("対象週を選択", week_list, "rep_week")
     df_w = df_raw[df_raw["year_week"] == sel_week]
 
     wc1, wc2, wc3 = st.columns(3)

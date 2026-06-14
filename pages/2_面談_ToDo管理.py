@@ -13,6 +13,8 @@ from utils.data_manager import (
     get_company_list, get_project_list_by_company, get_project_options,
 )
 from utils.styles import THEME_CSS, status_badge, render_sidebar, set_flash, show_flash
+from utils.ui import jp_date_selector
+from datetime import date
 
 st.set_page_config(page_title="面談・ToDo管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -64,11 +66,13 @@ with tab_interview:
         if proj_hints:
             iv_c2.caption("登録済み: " + "　".join(proj_hints))
 
-        with st.form("add_interview_form", clear_on_submit=True):
-            r2c1, r2c2 = st.columns(2)
-            interview_date = r2c1.text_input("面談日 (YYYY-MM-DD)", placeholder="2026-06-15")
-            status         = r2c2.selectbox("ステータス", ["結果待ち", "通過", "不通過","辞退","不明"])
+        idc1, idc2 = st.columns(2)
+        with idc1:
+            st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>面談日</div>", unsafe_allow_html=True)
+            interview_date = jp_date_selector("iv_date", default=date.today(), allow_empty=True)
+        status = idc2.selectbox("ステータス", ["結果待ち", "通過", "不通過","辞退","不明"], key="iv_status_add")
 
+        with st.form("add_interview_form", clear_on_submit=False):
             work_content       = st.text_area("業務内容", height=80, placeholder="担当する業務の概要")
             attendance_content = st.text_area("勤怠内容", height=60, placeholder="週5日フルリモート 等")
             memo               = st.text_input("メモ")
@@ -151,15 +155,17 @@ with tab_interview:
                     if _pr_hints:
                         ie2.caption("登録済み: " + "　".join(_pr_hints))
 
+                    _iv_statuses = ["結果待ち", "通過", "不通過", "辞退", "不明"]
+                    ie3, ie4 = st.columns(2)
+                    with ie3:
+                        st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>面談日</div>", unsafe_allow_html=True)
+                        new_date = jp_date_selector(f"iv_edate_{rid}", default=row.get("interview_date", ""), allow_empty=True)
+                    new_status = ie4.selectbox(
+                        "ステータス", _iv_statuses,
+                        index=_iv_statuses.index(row.get("status", "結果待ち")) if row.get("status", "") in _iv_statuses else 0,
+                        key=f"iv_estatus_{rid}",
+                    )
                     with st.form(f"iv_edit_form_{rid}"):
-                        ef3, ef4 = st.columns(2)
-                        new_date   = ef3.text_input("面談日 (YYYY-MM-DD)", value=row.get("interview_date", ""))
-                        new_status = ef4.selectbox(
-                            "ステータス",
-                            ["結果待ち", "通過", "不通過"],
-                            index=["結果待ち", "通過", "不通過"].index(row.get("status", "結果待ち"))
-                            if row.get("status", "") in ["結果待ち", "通過", "不通過"] else 0,
-                        )
                         new_work   = st.text_area("業務内容", value=row.get("work_content", ""), height=80)
                         new_att    = st.text_area("勤怠内容", value=row.get("attendance_content", ""), height=60)
                         new_memo   = st.text_input("メモ", value=row.get("memo", ""))
@@ -212,12 +218,12 @@ with tab_todo:
         todo_projects = get_project_list_by_company(todo_company) if todo_company else []
         todo_project  = td_c2.selectbox("案件名", [""] + todo_projects, key="todo_project")
 
-        with st.form("add_todo_form", clear_on_submit=True):
+        st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>期限</div>", unsafe_allow_html=True)
+        due_date = jp_date_selector("todo_due", default=date.today(), allow_empty=True)
 
+        with st.form("add_todo_form", clear_on_submit=False):
             task     = st.text_input("タスク内容 *", placeholder="〇〇の資料を作成する")
-            tc3, tc4 = st.columns(2)
-            due_date = tc3.date_input("期限")
-            progress = tc4.selectbox("進捗", ["未着手", "進行中", "完了"])
+            progress = st.selectbox("進捗", ["未着手", "進行中", "完了"])
             t_submitted = st.form_submit_button("登録する", use_container_width=True)
 
         if t_submitted:
@@ -292,14 +298,14 @@ with tab_todo:
 
                 # 編集フォーム
                 if st.session_state.get(edit_key):
+                    st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>期限</div>", unsafe_allow_html=True)
+                    new_due = jp_date_selector(f"td_edue_{rid}", default=row.get("due_date", ""), allow_empty=True)
                     with st.form(f"td_edit_form_{rid}"):
                         new_task = st.text_input("タスク内容", value=row.get("task", ""))
                         ef1, ef2 = st.columns(2)
                         new_company = ef1.text_input("会社名", value=row.get("company", ""))
                         new_proj    = ef2.text_input("案件名", value=row.get("project_name", ""))
-                        ef3, ef4 = st.columns(2)
-                        new_due  = ef3.text_input("期限 (YYYY-MM-DD)", value=row.get("due_date", ""))
-                        new_prog = ef4.selectbox(
+                        new_prog = st.selectbox(
                             "進捗",
                             ["未着手", "進行中", "完了"],
                             index=["未着手", "進行中", "完了"].index(row.get("progress", "未着手"))

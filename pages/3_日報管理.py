@@ -15,6 +15,8 @@ from utils.data_manager import (
     get_company_list, get_project_list_by_company,
 )
 from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
+from utils.ui import persist_selectbox
+from utils.holidays import get_holidays
 
 st.set_page_config(page_title="日報管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -100,11 +102,13 @@ def time_inputs(label_start="出社時刻", label_end="退勤時刻", label_brk=
     return parse_hhmm(s, default_start), parse_hhmm(e, default_end), parse_hhmm(b, default_brk)
 
 
-def render_calendar(year: int, month: int, recorded: dict) -> str:
+def render_calendar(year: int, month: int, recorded: dict, holidays: dict | None = None) -> str:
     """
     recorded: {day(int): attendance_type(str)} の辞書
+    holidays: {date: 祝日名} の辞書（祝日は日曜と同じ赤色＋名称表示）
     カレンダーHTMLを返す
     """
+    holidays = holidays or {}
     cal = calendar.monthcalendar(year, month)
     dow_labels = ["月", "火", "水", "木", "金", "土", "日"]
 
@@ -116,6 +120,7 @@ def render_calendar(year: int, month: int, recorded: dict) -> str:
 
     rows_html = ""
     today = date.today()
+    has_holiday = False
     for week in cal:
         cells = ""
         for i, day in enumerate(week):
@@ -126,18 +131,26 @@ def render_calendar(year: int, month: int, recorded: dict) -> str:
             color = ATT_COLOR.get(att, "") if att else ""
             is_today = (year == today.year and month == today.month and day == today.day)
             is_sat = (i == 5)
-            is_sun = (i == 6)
+            hol_name = holidays.get(date(year, month, day))
+            is_hol = hol_name is not None
+            is_sun = (i == 6) or is_hol
+            if is_hol:
+                has_holiday = True
 
-            day_color = "#60a5fa" if is_sat else ("#f87171" if is_sun else "#c8d6e5")
-            bg = color if color else ("rgba(255,255,255,0.04)" if not (is_sat or is_sun) else "transparent")
+            day_color = "#f87171" if is_sun else ("#60a5fa" if is_sat else "#c8d6e5")
+            bg = color if color else ("rgba(248,113,113,0.08)" if is_hol else ("rgba(255,255,255,0.04)" if not (is_sat or is_sun) else "transparent"))
             border = "2px solid #3b82f6" if is_today else "1px solid transparent"
             dot = f"<div style='width:6px;height:6px;border-radius:50%;background:{color};margin:2px auto 0;'></div>" if color else ""
+            hol_label = (
+                f"<div style='font-size:0.55rem;color:#f87171;line-height:1.1;margin-top:1px;'>"
+                f"{hol_name[:5]}</div>" if is_hol and not color else ""
+            )
 
             cells += (
                 f"<td style='text-align:center;padding:6px 2px;border-radius:6px;"
-                f"background:{bg};border:{border};'>"
+                f"background:{bg};border:{border};' title='{hol_name or ''}'>"
                 f"<span style='font-size:0.82rem;color:{day_color};font-weight:{'700' if is_today else '400'};'>"
-                f"{day}</span>{dot}</td>"
+                f"{day}</span>{dot}{hol_label}</td>"
             )
         rows_html += f"<tr>{cells}</tr>"
 
@@ -147,6 +160,11 @@ def render_calendar(year: int, month: int, recorded: dict) -> str:
         for k, c in ATT_COLOR.items()
         if k in recorded.values()
     )
+    if has_holiday:
+        legend += (
+            "<span style='display:inline-flex;align-items:center;gap:4px;margin-right:10px;font-size:0.72rem;color:#f87171;'>"
+            "<span style='width:8px;height:8px;border-radius:50%;background:#f87171;display:inline-block;'></span>祝日</span>"
+        )
 
     jp_months = ["1月","2月","3月","4月","5月","6月","7月","8月","9月","10月","11月","12月"]
     title = f"{year}年{jp_months[month-1]}"
@@ -195,12 +213,11 @@ def ym_to_jp(ym: str) -> str:
     return f"{y}年{JP_MONTHS[m-1]}"
 
 months_reversed = list(reversed(all_months))
-cal_month = st.selectbox(
+cal_month = persist_selectbox(
     "表示月",
     months_reversed,
+    "cal_month",
     format_func=ym_to_jp,
-    key="cal_month",
-    index=0,
 )
 cal_y, cal_m = int(cal_month[:4]), int(cal_month[5:])
 
@@ -215,7 +232,7 @@ if not df_all_daily.empty:
         except Exception:
             pass
 
-st.markdown(render_calendar(cal_y, cal_m, recorded_days), unsafe_allow_html=True)
+st.markdown(render_calendar(cal_y, cal_m, recorded_days, get_holidays()), unsafe_allow_html=True)
 cnt = len(recorded_days)
 total_days = calendar.monthrange(cal_y, cal_m)[1]
 st.caption(f"{cal_month}：{cnt} 日 / {total_days} 日 入力済み")
@@ -324,13 +341,15 @@ if df.empty:
     st.stop()
 
 fc1, fc2, fc3 = st.columns(3)
-sel_month   = fc1.selectbox(
-    "月で絞り込み",
-    ["全期間"] + list(reversed(all_months)),
-    format_func=lambda v: v if v == "全期間" else ym_to_jp(v),
-    key="dr_month",
-)
-sel_company = fc2.selectbox("会社で絞り込み", ["全社"]   + companies,                  key="dr_company_f")
+with fc1:
+    sel_month = persist_selectbox(
+        "月で絞り込み",
+        ["全期間"] + list(reversed(all_months)),
+        "dr_month",
+        format_func=lambda v: v if v == "全期間" else ym_to_jp(v),
+    )
+with fc2:
+    sel_company = persist_selectbox("会社で絞り込み", ["全社"] + companies, "dr_company_f")
 
 df_view = df.copy()
 if sel_month   != "全期間": df_view = df_view[df_view["date"].str.startswith(sel_month, na=False)]

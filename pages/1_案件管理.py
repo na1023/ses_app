@@ -5,11 +5,13 @@ pages/1_案件管理.py
 
 import pandas as pd
 import streamlit as st
+from datetime import date
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, save, generate_id, init_all
 from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash, status_badge
+from utils.ui import jp_date_selector
 
 st.set_page_config(page_title="案件管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -35,16 +37,23 @@ PROJECT_STATUSES = ["参画前", "参画中", "終了"]
 
 # ===== 新規登録フォーム =====
 with st.expander("新規案件を登録", expanded=False):
-    with st.form("add_project_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        company      = c1.text_input("会社名 *", placeholder="株式会社〇〇")
-        project_name = c2.text_input("案件名 *", placeholder="〇〇システム開発")
-        c3, c4, c5 = st.columns(3)
-        proj_status = c3.selectbox("ステータス", PROJECT_STATUSES, index=0)
-        start_date  = c4.text_input("開始日 (YYYY-MM-DD)", placeholder="2026-04-01")
-        end_date    = c5.text_input("終了日 (YYYY-MM-DD)", placeholder="2027-03-31")
-        memo        = st.text_area("メモ", height=80)
-        submitted   = st.form_submit_button("登録する", use_container_width=True)
+    c1, c2 = st.columns(2)
+    company      = c1.text_input("会社名 *", placeholder="株式会社〇〇", key="add_company")
+    project_name = c2.text_input("案件名 *", placeholder="〇〇システム開発", key="add_project")
+
+    proj_status = st.selectbox("ステータス", PROJECT_STATUSES, index=0, key="add_status")
+
+    dcol1, dcol2 = st.columns(2)
+    with dcol1:
+        st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>開始日</div>", unsafe_allow_html=True)
+        start_date = jp_date_selector("add_start", default=date.today(), allow_empty=True)
+    with dcol2:
+        st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>終了日</div>", unsafe_allow_html=True)
+        end_date = jp_date_selector("add_end", default="", allow_empty=True)
+
+    with st.form("add_project_form", clear_on_submit=False):
+        memo      = st.text_area("メモ", height=80)
+        submitted = st.form_submit_button("登録する", use_container_width=True)
 
     if submitted:
         if not company or not project_name:
@@ -144,14 +153,18 @@ for _, row in df_view.iterrows():
         # 編集フォーム
         if st.session_state.get(edit_key):
             cur_st_idx = PROJECT_STATUSES.index(st_val) if st_val in PROJECT_STATUSES else 0
+            ec1, ec2 = st.columns(2)
+            new_company = ec1.text_input("会社名", value=row["company"], key=f"ec_co_{rid}")
+            new_proj    = ec2.text_input("案件名", value=row["project_name"], key=f"ec_pr_{rid}")
+            new_status  = st.selectbox("ステータス", PROJECT_STATUSES, index=cur_st_idx, key=f"ec_st_{rid}")
+            ed1, ed2 = st.columns(2)
+            with ed1:
+                st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>開始日</div>", unsafe_allow_html=True)
+                new_start = jp_date_selector(f"ec_start_{rid}", default=row.get("start_date", ""), allow_empty=True)
+            with ed2:
+                st.markdown("<div style='font-size:0.82rem;color:#94a3b8;margin-bottom:0.25rem;'>終了日</div>", unsafe_allow_html=True)
+                new_end = jp_date_selector(f"ec_end_{rid}", default=row.get("end_date", ""), allow_empty=True)
             with st.form(f"edit_form_{rid}"):
-                ec1, ec2 = st.columns(2)
-                new_company = ec1.text_input("会社名", value=row["company"])
-                new_proj    = ec2.text_input("案件名", value=row["project_name"])
-                ec3, ec4, ec5 = st.columns(3)
-                new_status = ec3.selectbox("ステータス", PROJECT_STATUSES, index=cur_st_idx)
-                new_start  = ec4.text_input("開始日 (YYYY-MM-DD)", value=row.get("start_date", ""))
-                new_end    = ec5.text_input("終了日 (YYYY-MM-DD)", value=row.get("end_date", ""))
                 new_memo   = st.text_area("メモ", value=row.get("memo", ""), height=80)
                 save_btn, cancel_btn = st.columns(2)
                 do_save   = save_btn.form_submit_button("保存する", use_container_width=True)

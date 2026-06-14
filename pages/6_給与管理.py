@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.data_manager import load, save, generate_id, init_all
 from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
+from utils.ui import persist_selectbox
 
 st.set_page_config(page_title="給与管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -359,11 +360,11 @@ with tab_reg:
     reg_type = st.radio("種別", ["給与", "賞与"], horizontal=True, key="sal_type_radio")
     st.markdown("---")
 
-    reg_ym = st.selectbox(
+    reg_ym = persist_selectbox(
         "対象月",
         list(reversed(all_ym)),
+        "sal_ym",
         format_func=ym_jp,
-        key="sal_ym",
     )
     if reg_type == "給与":
         st.caption(
@@ -422,8 +423,8 @@ with tab_list:
     if df_sal.empty:
         st.info("給与データがまだ登録されていません。")
     else:
-        sel_ym = st.selectbox(
-            "表示月", list(reversed(all_ym)), format_func=ym_jp, key="sal_list_ym"
+        sel_ym = persist_selectbox(
+            "表示月", list(reversed(all_ym)), "sal_list_ym", format_func=ym_jp
         )
         df_month = df_sal[df_sal["year_month"] == sel_ym].reset_index(drop=True)
         if df_month.empty:
@@ -556,7 +557,7 @@ with tab_summary:
         st.stop()
 
     years_available = sorted(df_sal["year_month"].str[:4].unique().tolist(), reverse=True)
-    sel_year = st.selectbox("対象年", years_available, format_func=lambda y: f"{y}年", key="sal_year")
+    sel_year = persist_selectbox("対象年", years_available, "sal_year", format_func=lambda y: f"{y}年")
 
     df_year_sal = df_sal[(df_sal["year_month"].str.startswith(sel_year)) & (df_sal["salary_type"] == "給与")].copy()
     df_year_bon = df_sal[(df_sal["year_month"].str.startswith(sel_year)) & (df_sal["salary_type"] == "賞与")].copy()
