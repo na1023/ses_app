@@ -16,6 +16,7 @@ from utils.data_manager import (
     _use_supabase,
 )
 from utils.styles import THEME_CSS, render_sidebar, set_flash, show_flash
+from utils.diagnostics import run_diagnostics, summarize, DATASET_LABELS
 
 st.set_page_config(page_title="設定・データ管理 | SES業務管理", layout="wide")
 st.markdown(THEME_CSS, unsafe_allow_html=True)
@@ -54,11 +55,107 @@ KEY_LABELS = {
     "interviews": "面談データ",
     "todos":      "ToDo データ",
     "daily":      "日報データ",
+    "salary":     "給与データ",
 }
 
-tab_export, tab_import, tab_backup, tab_reset, tab_supabase = st.tabs(
-    ["エクスポート", "インポート", "バックアップ", "データリセット", "Supabase 設定手順"]
+tab_check, tab_export, tab_import, tab_backup, tab_reset, tab_supabase = st.tabs(
+    ["エラー自動検出", "エクスポート", "インポート", "バックアップ", "データリセット", "Supabase 設定手順"]
 )
+
+# ================================================================
+# エラー自動検出タブ
+# ================================================================
+with tab_check:
+    st.markdown("#### データ整合性の自動チェック")
+    st.caption(
+        "全データ（案件・面談・ToDo・日報・給与）を横断し、"
+        "ID重複・日付/時刻の矛盾・実働時間のズレ・数値異常・範囲外の値などを検査します。"
+    )
+
+    SEV_META = {
+        "error":   ("エラー",   "#ef4444", "🛑"),
+        "warning": ("警告",     "#f59e0b", "⚠️"),
+        "info":    ("情報",     "#3b82f6", "ℹ️"),
+    }
+
+    auto_run = st.session_state.pop("_diag_autorun", False)
+    if st.button("チェックを実行する", key="run_diag", use_container_width=True, type="primary") or auto_run:
+        with st.spinner("データを検査しています..."):
+            findings = run_diagnostics()
+        st.session_state["_diag_result"] = findings
+
+    findings = st.session_state.get("_diag_result")
+    if findings is not None:
+        summary = summarize(findings)
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("検出総数", summary["total"])
+        m2.metric("🛑 エラー", summary["error"])
+        m3.metric("⚠️ 警告",  summary["warning"])
+        m4.metric("ℹ️ 情報",  summary["info"])
+
+        if summary["total"] == 0:
+            st.success("問題は検出されませんでした。データは健全です。")
+        else:
+            # 重大度フィルタ
+            sev_choice = st.multiselect(
+                "表示する重大度",
+                ["error", "warning", "info"],
+                default=["error", "warning", "info"],
+                format_func=lambda s: SEV_META[s][0],
+                key="diag_sev_filter",
+            )
+            ds_choice = st.multiselect(
+                "対象データ",
+                sorted({f["dataset"] for f in findings}),
+                default=sorted({f["dataset"] for f in findings}),
+                key="diag_ds_filter",
+            )
+
+            shown = [
+                f for f in findings
+                if f["severity"] in sev_choice and f["dataset"] in ds_choice
+            ]
+            # 重大度順（error→warning→info）にソート
+            order = {"error": 0, "warning": 1, "info": 2}
+            shown.sort(key=lambda f: (order[f["severity"]], f["dataset"]))
+
+            st.caption(f"表示 {len(shown)} 件 / 全 {summary['total']} 件")
+
+            rows_html = ""
+            for f in shown:
+                label, color, icon = SEV_META[f["severity"]]
+                rid = f"<code>{f['row_id'][:8]}</code>" if f["row_id"] else "—"
+                field = f"<code>{f['field']}</code>" if f["field"] else "—"
+                hint = f"<div style='color:#64748b;font-size:0.75rem;margin-top:2px;'>💡 {f['hint']}</div>" if f["hint"] else ""
+                rows_html += (
+                    f"<tr>"
+                    f"<td style='white-space:nowrap;color:{color};font-weight:600;'>{icon} {label}</td>"
+                    f"<td style='white-space:nowrap;'>{f['dataset']}</td>"
+                    f"<td>{f['message']}{hint}</td>"
+                    f"<td style='white-space:nowrap;'>{field}</td>"
+                    f"<td style='white-space:nowrap;'>{rid}</td>"
+                    f"</tr>"
+                )
+            st.markdown(
+                f"""<div class="table-wrap"><table class="styled-table">
+                <thead><tr><th>重大度</th><th>データ</th><th>内容</th><th>項目</th><th>ID</th></tr></thead>
+                <tbody>{rows_html}</tbody></table></div>""",
+                unsafe_allow_html=True,
+            )
+
+            # CSV ダウンロード
+            import pandas as _pd
+            df_find = _pd.DataFrame(shown)[["severity", "dataset", "message", "field", "row_id", "hint"]]
+            df_find["severity"] = df_find["severity"].map(lambda s: SEV_META[s][0])
+            df_find.columns = ["重大度", "データ", "内容", "項目", "ID", "対処のヒント"]
+            st.download_button(
+                "検出結果を CSV でダウンロード",
+                data=df_find.to_csv(index=False, encoding="utf-8-sig").encode("utf-8-sig"),
+                file_name=f"data_diagnostics_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                mime="text/csv",
+            )
+    else:
+        st.info("「チェックを実行する」を押すと検査を開始します。")
 
 # ================================================================
 # エクスポートタブ

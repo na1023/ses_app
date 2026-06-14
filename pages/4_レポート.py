@@ -146,8 +146,23 @@ with tab_monthly:
 # 週報タブ
 # ================================================================
 with tab_weekly:
+    # 週キー → 「YYYY/MM/DD（月）〜 MM/DD（日）」の分かりやすいラベルを生成
+    week_label_map: dict[str, str] = {}
+    for wk, grp in df_raw.groupby("year_week"):
+        dmin = grp["date"].min()
+        monday = dmin - timedelta(days=int(dmin.weekday()))
+        sunday = monday + timedelta(days=6)
+        n_days = grp["date"].dt.normalize().nunique()
+        week_label_map[wk] = (
+            f"{monday.strftime('%Y/%m/%d')}（月）〜 {sunday.strftime('%m/%d')}（日）　[{n_days}日記録]"
+        )
+
     week_list = sorted(df_raw["year_week"].unique().tolist(), reverse=True)
-    sel_week  = persist_selectbox("対象週を選択", week_list, "rep_week")
+    sel_week  = persist_selectbox(
+        "対象週を選択", week_list, "rep_week",
+        format_func=lambda wk: week_label_map.get(wk, wk),
+    )
+    st.caption(f"対象期間: {week_label_map.get(sel_week, sel_week)}")
     df_w = df_raw[df_raw["year_week"] == sel_week]
 
     wc1, wc2, wc3 = st.columns(3)
