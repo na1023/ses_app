@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>株式取引履歴管理ツール</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+<div class="min-h-screen">
+
+  <!-- ===== トップバー（モバイルのみ） ===== -->
+  <header class="md:hidden flex items-center justify-between bg-white border-b px-4 h-14 sticky top-0 z-20">
+    <button id="menuBtn" class="p-2 -ml-2" aria-label="メニュー">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+      </svg>
+    </button>
+    <span class="font-bold">株式取引管理</span>
+    <span class="w-6"></span>
+  </header>
+
+  <div class="md:flex">
+
+    <!-- ===== サイドバー ===== -->
+    <aside id="sidebar"
+      class="fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 p-4
+             transform -translate-x-full transition-transform duration-200
+             md:translate-x-0 md:static md:inset-auto md:z-auto md:shrink-0 md:min-h-screen">
+      <h1 class="hidden md:block text-lg font-bold mb-6">株式取引管理</h1>
+      <nav class="space-y-1">
+        <a href="#import"  class="nav-link block px-3 py-2 rounded hover:bg-slate-700">CSV取込</a>
+        <a href="#summary" class="nav-link block px-3 py-2 rounded hover:bg-slate-700">サマリー</a>
+        <a href="#chart"   class="nav-link block px-3 py-2 rounded hover:bg-slate-700">分析グラフ</a>
+        <a href="#history" class="nav-link block px-3 py-2 rounded hover:bg-slate-700">取引履歴</a>
+      </nav>
+      <button id="clearBtn"
+        class="mt-8 w-full text-sm px-3 py-2 rounded bg-slate-800 hover:bg-red-700 text-slate-300">
+        全データ削除
+      </button>
+      <p class="mt-4 text-xs text-slate-500">データはこの端末の localStorage に保存されます。</p>
+    </aside>
+
+    <div id="overlay" class="fixed inset-0 z-30 bg-black/50 hidden md:hidden"></div>
+
+    <!-- ===== メイン ===== -->
+    <main class="flex-1 min-w-0 p-4 md:p-8 space-y-8">
+
+      <!-- CSV取込 -->
+      <section id="import" class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <h2 class="text-lg font-bold mb-4">CSV取込</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+          <label class="block">
+            <span class="text-sm text-slate-500">証券会社</span>
+            <select id="brokerSelect" class="mt-1 w-full border rounded px-3 py-2">
+              <option value="auto">自動判定</option>
+              <option value="SBI">SBI証券</option>
+              <option value="Rakuten">楽天証券</option>
+              <option value="Matsui">松井証券</option>
+            </select>
+          </label>
+          <label class="block md:col-span-2">
+            <span class="text-sm text-slate-500">CSVファイル</span>
+            <input id="fileInput" type="file" accept=".csv"
+              class="mt-1 w-full border rounded px-3 py-2 file:mr-3 file:px-3 file:py-1 file:border-0 file:bg-slate-100 file:rounded" />
+          </label>
+        </div>
+        <p id="importMsg" class="mt-3 text-sm"></p>
+      </section>
+
+      <!-- サマリー -->
+      <section id="summary" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <p class="text-sm text-slate-500">取引件数</p>
+          <p id="kpiCount" class="text-2xl font-bold mt-1 tabular-nums">0</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <p class="text-sm text-slate-500">買付総額</p>
+          <p id="kpiBuy" class="text-2xl font-bold mt-1 tabular-nums">¥0</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm p-5">
+          <p class="text-sm text-slate-500">売却総額</p>
+          <p id="kpiSell" class="text-2xl font-bold mt-1 tabular-nums">¥0</p>
+        </div>
+      </section>
+
+      <!-- グラフ -->
+      <section id="chart" class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <h2 class="text-lg font-bold mb-4">取引区分別 買付額</h2>
+        <div class="relative h-64 md:h-96">
+          <canvas id="accountChart"></canvas>
+        </div>
+      </section>
+
+      <!-- 履歴 -->
+      <section id="history" class="bg-white rounded-xl shadow-sm p-4 md:p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-bold">取引履歴</h2>
+          <input id="searchInput" type="text" placeholder="銘柄で絞込み"
+            class="border rounded px-3 py-1.5 text-sm w-40 md:w-60" />
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm whitespace-nowrap">
+            <thead class="text-left text-slate-500 border-b">
+              <tr>
+                <th class="py-2 pr-4">日付</th>
+                <th class="py-2 pr-4">銘柄</th>
+                <th class="py-2 pr-4">区分</th>
+                <th class="py-2 pr-4">売買</th>
+                <th class="py-2 pr-4 text-right">株数</th>
+                <th class="py-2 pr-4 text-right">金額</th>
+                <th class="py-2 pr-4 hidden md:table-cell">備考</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <p id="emptyMsg" class="text-center text-slate-400 py-8 hidden">データがありません。CSVを取込んでください。</p>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   1. 統一スキーマ用ユーティリティ
+   ============================================================ */
+const yen = n => "¥" + Math.round(n).toLocaleString("ja-JP");
+const num = s => Number(String(s ?? "").replace(/[^\d.-]/g, "")) || 0;
+const toISO = s => {
+  if (!s) return "";
+  const m = String(s).trim().match(/(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  return m ? `${m[1]}-${m[2].padStart(2,"0")}-${m[3].padStart(2,"0")}` : String(s).trim();
+};
+
+const ACCOUNT_DICT = {
+  "特定預り":"特定","特定口座":"特定","特定":"特定",
+  "一般預り":"一般","一般口座":"一般","一般":"一般",
+  "NISA預り":"NISA","NISA":"NISA","ニーサ":"NISA",
+  "成長投資枠":"新NISA成長","つみたて投資枠":"新NISA積立",
+};
+const mapAccount = raw => ACCOUNT_DICT[String(raw ?? "").trim()] ?? "一般";
+const mapSide = raw => /買|buy/i.test(raw ?? "") ? "buy" : "sell";
+
+/* ============================================================
+   2. 証券会社別アダプタ
+   ============================================================ */
+const brokerAdapters = {
+  SBI: {
+    signature: ["約定日","銘柄コード","預り区分","約定数量"],
+    map: {
+      symbolCode: r => r["銘柄コード"], symbolName: r => r["銘柄"] ?? r["銘柄名"],
+      date: r => toISO(r["約定日"]), account: r => mapAccount(r["預り区分"]),
+      side: r => mapSide(r["取引"]), shares: r => num(r["約定数量"]),
+      amount: r => num(r["受渡金額"]), note: r => r["備考"] ?? "",
+    }
+  },
+  Rakuten: {
+    signature: ["約定日","口座区分","数量［株］"],
+    map: {
+      symbolCode: r => r["銘柄コード"], symbolName: r => r["銘柄名"],
+      date: r => toISO(r["約定日"]), account: r => mapAccount(r["口座区分"]),
+      side: r => mapSide(r["売買区分"]), shares: r => num(r["数量［株］"]),
+      amount: r => num(r["受渡金額［円］"] ?? r["受渡金額"]), note: r => r["備考"] ?? "",
+    }
+  },
+  Matsui: {
+    signature: ["約定日","区分","数量"],
+    map: {
+      symbolCode: r => r["コード"] ?? r["銘柄コード"], symbolName: r => r["銘柄名"],
+      date: r => toISO(r["約定日"]), account: r => mapAccount(r["区分"]),
+      side: r => mapSide(r["売買"]), shares: r => num(r["数量"]),
+      amount: r => num(r["受渡金額"]), note: r => r["摘要"] ?? "",
+    }
+  },
+};
+
+function detectBroker(headers) {
+  const set = new Set(headers);
+  let best = null, bestScore = 0;
+  for (const [name, def] of Object.entries(brokerAdapters)) {
+    const score = def.signature.filter(h => set.has(h)).length;
+    if (score > bestScore) { bestScore = score; best = name; }
+  }
+  return bestScore >= 2 ? best : null;
+}
+
+function normalize(rows, broker) {
+  const { map } = brokerAdapters[broker];
+  return rows.map(row => {
+    const rec = {};
+    for (const key in map) rec[key] = map[key](row);
+    return rec;
+  }).filter(r => r.date && r.shares > 0);
+}
+
+/* ============================================================
+   3. ストレージ
+   ============================================================ */
+const STORE_KEY = "kabu_trades_v1";
+let trades = JSON.parse(localStorage.getItem(STORE_KEY) || "[]");
+const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(trades));
+
+/* ============================================================
+   4. CSV取込
+   ============================================================ */
+const importMsg = document.getElementById("importMsg");
+document.getElementById("fileInput").addEventListener("change", e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    // Shift_JIS / UTF-8 両対応（まずSJISでデコード、文字化け時はUTF-8）
+    let text = new TextDecoder("shift-jis").decode(reader.result);
+    if (/�/.test(text)) text = new TextDecoder("utf-8").decode(reader.result);
+
+    const parsed = Papa.parse(text.trim(), { header: true, skipEmptyLines: true });
+    const headers = parsed.meta.fields || [];
+
+    let broker = document.getElementById("brokerSelect").value;
+    if (broker === "auto") broker = detectBroker(headers);
+    if (!broker) {
+      importMsg.className = "mt-3 text-sm text-red-600";
+      importMsg.textContent = "証券会社を自動判定できませんでした。手動で選択してください。";
+      return;
+    }
+    const recs = normalize(parsed.data, broker);
+    if (recs.length === 0) {
+      importMsg.className = "mt-3 text-sm text-red-600";
+      importMsg.textContent = "有効な取引行が見つかりませんでした。列名をご確認ください。";
+      return;
+    }
+    trades = trades.concat(recs);
+    save();
+    render();
+    importMsg.className = "mt-3 text-sm text-green-600";
+    importMsg.textContent = `${broker} のCSVから ${recs.length} 件取込みました。`;
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = "";
+});
+
+/* ============================================================
+   5. 描画
+   ============================================================ */
+let chart;
+function render() {
+  // KPI
+  const buy  = trades.filter(t => t.side === "buy").reduce((s,t)=>s+Math.abs(t.amount),0);
+  const sell = trades.filter(t => t.side === "sell").reduce((s,t)=>s+Math.abs(t.amount),0);
+  document.getElementById("kpiCount").textContent = trades.length.toLocaleString();
+  document.getElementById("kpiBuy").textContent  = yen(buy);
+  document.getElementById("kpiSell").textContent = yen(sell);
+
+  // グラフ: 取引区分別 買付額
+  const byAcc = {};
+  trades.filter(t=>t.side==="buy").forEach(t => byAcc[t.account]=(byAcc[t.account]||0)+Math.abs(t.amount));
+  drawChart(Object.keys(byAcc), Object.values(byAcc));
+
+  // テーブル
+  renderTable();
+}
+
+function drawChart(labels, data) {
+  const ctx = document.getElementById("accountChart");
+  if (chart) chart.destroy();
+  chart = new Chart(ctx, {
+    type: "bar",
+    data: { labels, datasets: [{ label: "買付額", data,
+      backgroundColor: ["#0ea5e9","#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6"] }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { ticks: { callback: v => "¥" + v.toLocaleString() } } }
+    }
+  });
+}
+
+function renderTable() {
+  const q = document.getElementById("searchInput").value.trim();
+  const body = document.getElementById("historyBody");
+  const rows = trades
+    .filter(t => !q || (t.symbolName||"").includes(q) || (t.symbolCode||"").includes(q))
+    .slice().sort((a,b)=> b.date.localeCompare(a.date));
+
+  document.getElementById("emptyMsg").classList.toggle("hidden", rows.length>0);
+  body.innerHTML = rows.map(t => `
+    <tr class="border-b last:border-0">
+      <td class="py-2 pr-4 tabular-nums">${t.date}</td>
+      <td class="py-2 pr-4">${t.symbolName||""}<span class="text-slate-400 text-xs ml-1">${t.symbolCode||""}</span></td>
+      <td class="py-2 pr-4"><span class="px-2 py-0.5 rounded text-xs bg-slate-100">${t.account}</span></td>
+      <td class="py-2 pr-4 ${t.side==="buy"?"text-rose-600":"text-emerald-600"}">${t.side==="buy"?"買":"売"}</td>
+      <td class="py-2 pr-4 text-right tabular-nums">${t.shares.toLocaleString()}</td>
+      <td class="py-2 pr-4 text-right tabular-nums">${yen(Math.abs(t.amount))}</td>
+      <td class="py-2 pr-4 hidden md:table-cell text-slate-500">${t.note||""}</td>
+    </tr>`).join("");
+}
+
+document.getElementById("searchInput").addEventListener("input", renderTable);
+
+/* ============================================================
+   6. メニュー開閉・クリア
+   ============================================================ */
+const sidebar = document.getElementById("sidebar");
+const overlay = document.getElementById("overlay");
+const closeMenu = () => { sidebar.classList.add("-translate-x-full"); overlay.classList.add("hidden"); };
+document.getElementById("menuBtn").addEventListener("click", () => {
+  sidebar.classList.remove("-translate-x-full"); overlay.classList.remove("hidden");
+});
+overlay.addEventListener("click", closeMenu);
+document.querySelectorAll(".nav-link").forEach(a => a.addEventListener("click", closeMenu));
+document.getElementById("clearBtn").addEventListener("click", () => {
+  if (confirm("全データを削除しますか？")) { trades = []; save(); render(); }
+});
+
+render();
+</script>
+</body>
+</html>

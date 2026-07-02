@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f1117;
+  --surface: #161b27;
+  --border: #1e2a3a;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --subtle: #64748b;
+  --accent: #3b82f6;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* iOS のセーフエリア対応 */
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.5rem);
+}
+
+/* 入力系の共通スタイル（スマホで押しやすい高さ） */
+.field {
+  width: 100%;
+  background: #0f1420;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  color: var(--text);
+  font-size: 1rem;
+  outline: none;
+}
+.field:focus {
+  border-color: var(--accent);
+}
+.label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+  font-weight: 600;
+}
+
+/* チップ（勤怠区分の選択） */
+.chip {
+  padding: 0.55rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.12s;
+}
+.chip[data-active="true"] {
+  color: #fff;
+  border-color: transparent;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1rem;
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  font-size: 1.02rem;
+  border-radius: 12px;
+  padding: 0.95rem;
+  transition: opacity 0.12s;
+}
+.btn-primary:active {
+  opacity: 0.85;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+}

@@ -1,0 +1,1866 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <link rel="apple-touch-icon" href="https://www.google.com/images/icons/product/sheets-128.png">
+  <meta name="apple-mobile-web-app-title" content="家計簿">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#2e7d32">
+  <?!= include('Style'); ?>
+</head>
+<body>
+  <div class="app">
+    <div class="sticky-top">
+      <header class="topbar">
+        <div class="topbar-row">
+          <h1 id="app-title">家計簿</h1>
+          <button id="mode-switch" class="mode-switch" type="button">💳 引き落とし</button>
+        </div>
+        <nav class="tabs">
+          <button class="tab active" data-tab="input">入力</button>
+          <button class="tab" data-tab="history">履歴</button>
+          <button class="tab" data-tab="analysis">分析</button>
+          <button class="tab" data-tab="manage">管理</button>
+        </nav>
+      </header>
+      <div id="month-mini" class="mini-summary">
+        <div class="ms-cells">
+          <div class="ms-cell"><span>今月収入</span><b id="ms-income" class="num">¥0</b></div>
+          <div class="ms-cell"><span>今月支出</span><b id="ms-expense" class="num">¥0</b></div>
+          <div class="ms-cell"><span>収支</span><b id="ms-balance" class="num">¥0</b></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== 入力タブ ===== -->
+    <section id="tab-input" class="tabpanel">
+      <div id="scan-card" class="card scan-card hidden">
+        <button id="scan-receipt" class="btn-scan" type="button">📷 レシートを読み取る</button>
+        <input id="receipt-file" type="file" accept="image/*" capture="environment" hidden>
+        <div class="hint">写真を撮る/選ぶとAIが明細を自動入力します（要確認のうえ登録）</div>
+      </div>
+
+      <div class="card">
+        <div class="seg" id="type-seg">
+          <button class="seg-btn active" data-type="支出">支出</button>
+          <button class="seg-btn" data-type="収入">収入</button>
+          <button class="seg-btn" data-type="貯蓄">貯蓄</button>
+        </div>
+        <div class="field"><label>日付</label><input type="date" id="date"></div>
+        <div class="field"><label id="store-label">店名</label><input type="text" id="store" placeholder="例: ○○スーパー"></div>
+        <div class="field"><label>備考（任意）</label><input type="text" id="note" placeholder="メモ・補足など"></div>
+      </div>
+
+      <datalist id="item-list"></datalist>
+
+      <div class="card">
+        <div class="card-head"><span>明細</span>
+          <span class="head-btns">
+            <button id="tpl-btn" class="btn-ghost" type="button">📋 テンプレ</button>
+            <button id="recall-last" class="btn-ghost" type="button">↩ 前回</button>
+            <button id="add-row" class="btn-add" type="button">＋ 行</button>
+          </span>
+        </div>
+        <div id="rows"></div>
+        <button id="add-row-bottom" class="btn-add-wide" type="button">＋ 行を追加</button>
+      </div>
+
+      <div class="card total-card">
+        <div class="total-line"><span>合計（自動計算）</span><strong id="calc-total">¥0</strong></div>
+        <div class="field"><label>合計（検算用・任意）</label>
+          <div class="price-wrap"><input type="number" id="printed-total" inputmode="decimal" placeholder="レシートの合計額">
+          <button class="calc-btn" type="button" id="calc-printed" tabindex="-1">🧮</button></div>
+        </div>
+        <div id="verify-msg" class="verify"></div>
+      </div>
+
+      <button id="submit" class="btn-primary" type="button">登録する</button>
+      <div id="input-msg" class="msg"></div>
+    </section>
+
+    <!-- ===== 履歴タブ ===== -->
+    <section id="tab-history" class="tabpanel hidden">
+      <div class="card">
+        <div class="card-head"><span>履歴</span><button id="reload-history" class="btn-ghost" type="button">↻ 更新</button></div>
+        <div class="hist-filters">
+          <input type="search" id="h-search" placeholder="🔍 商品名・店名で検索">
+          <div class="hist-filter-row">
+            <select id="h-month"></select>
+            <select id="h-type"><option value="">すべて</option><option value="支出">支出のみ</option><option value="収入">収入のみ</option><option value="貯蓄">貯蓄のみ</option></select>
+            <select id="h-sort"><option value="desc">新しい順</option><option value="asc">古い順</option></select>
+          </div>
+          <div class="hist-filter-row">
+            <select id="h-preset"><option value="">★保存した条件…</option></select>
+            <button id="h-preset-save" class="btn-ghost" type="button">保存</button>
+            <button id="h-preset-del" class="btn-ghost" type="button">削除</button>
+          </div>
+        </div>
+        <div id="hist-count" class="hint"></div>
+        <div id="history-list" class="hist-list"></div>
+      </div>
+      <div id="history-msg" class="msg"></div>
+    </section>
+
+    <!-- ===== 分析タブ ===== -->
+    <section id="tab-analysis" class="tabpanel hidden">
+      <div class="card period-card">
+        <select id="a-year"></select>
+        <select id="a-month"></select>
+      </div>
+
+      <div class="subtabs">
+        <button class="subtab active" data-sub="balance">収支</button>
+        <button class="subtab" data-sub="saving">貯蓄</button>
+      </div>
+
+      <!-- 収支サブタブ -->
+      <div id="sub-balance">
+        <div class="card">
+          <div class="card-head"><span>前期比（収支・貯蓄）</span></div>
+          <div id="ratio-body"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>カレンダー（日別 支出）</span></div>
+          <div class="cal-weekdays"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+          <div id="calendar" class="calendar"></div>
+          <div id="cal-day-detail" class="cal-detail hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span id="month-title">当月</span></div>
+          <div class="kpi-grid">
+            <div class="kpi income"><div class="kpi-label">収入</div><div class="kpi-val" id="m-income">¥0</div><div class="kpi-diff" id="m-income-d"></div></div>
+            <div class="kpi expense"><div class="kpi-label">支出</div><div class="kpi-val" id="m-expense">¥0</div><div class="kpi-diff" id="m-expense-d"></div></div>
+            <div class="kpi balance"><div class="kpi-label">収支</div><div class="kpi-val" id="m-balance">¥0</div><div class="kpi-diff" id="m-balance-d"></div></div>
+          </div>
+          <div class="hint">前月比で表示（収支＝収入−支出、貯蓄は含みません）</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span id="year-title">当年</span></div>
+          <div class="kpi-grid">
+            <div class="kpi income"><div class="kpi-label">収入</div><div class="kpi-val" id="y-income">¥0</div><div class="kpi-diff" id="y-income-d"></div></div>
+            <div class="kpi expense"><div class="kpi-label">支出</div><div class="kpi-val" id="y-expense">¥0</div><div class="kpi-diff" id="y-expense-d"></div></div>
+            <div class="kpi balance"><div class="kpi-label">収支</div><div class="kpi-val" id="y-balance">¥0</div><div class="kpi-diff" id="y-balance-d"></div></div>
+          </div>
+          <div class="hint">前年比で表示</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>収支の推移（年間）</span></div>
+          <div id="trend-line"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>月別 収入・支出（年間）</span></div>
+          <div class="legend"><span class="lg income">収入</span><span class="lg expense">支出</span></div>
+          <div id="trend" class="trend"></div>
+          <div id="trend-detail" class="chart-detail hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>支出カテゴリ構成（当月）</span></div>
+          <div id="cat-donut" class="donut-wrap"></div>
+          <div id="donut-detail" class="chart-detail hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>カテゴリ別（当月・前月比）</span>
+            <select id="cat-sort" class="cat-sort">
+              <option value="設定順">設定順</option>
+              <option value="多い順">金額が多い順</option>
+              <option value="少ない順">金額が少ない順</option>
+            </select>
+          </div>
+          <div id="cat-breakdown" class="cat-break"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>カテゴリ別（年間合計）</span></div>
+          <div class="hint" style="margin-top:-4px;margin-bottom:8px;">カテゴリをタップすると月別推移が表示されます</div>
+          <div id="year-cat" class="cat-break"></div>
+        </div>
+      </div>
+
+      <!-- 貯蓄サブタブ -->
+      <div id="sub-saving" class="hidden">
+        <div class="card">
+          <div class="card-head"><span>🎯 貯蓄目標（カテゴリ別）</span></div>
+          <div id="goal-body"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>貯蓄サマリー</span></div>
+          <div class="kpi-grid g2">
+            <div class="kpi saving"><div class="kpi-label">今月の貯蓄</div><div class="kpi-val" id="m-saving">¥0</div><div class="kpi-diff" id="m-saving-d"></div></div>
+            <div class="kpi saving"><div class="kpi-label">今年の貯蓄</div><div class="kpi-val" id="y-saving">¥0</div><div class="kpi-diff" id="y-saving-d"></div></div>
+          </div>
+          <div class="hint">前月比 / 前年比</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>月別 貯蓄（年間）</span></div>
+          <div id="saving-trend" class="trend"></div>
+          <div id="saving-trend-detail" class="chart-detail hidden"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><span>貯蓄カテゴリ別（年間）</span></div>
+          <div class="hint" style="margin-top:-4px;margin-bottom:8px;">カテゴリをタップすると月別推移が表示されます</div>
+          <div id="saving-cat" class="cat-break"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== 管理タブ ===== -->
+    <section id="tab-manage" class="tabpanel hidden">
+      <div class="card">
+        <div class="card-head"><span>カテゴリ管理</span></div>
+        <div class="field inline">
+          <input type="text" id="new-category" placeholder="新しいカテゴリ名">
+          <select id="new-category-type" class="type-select"><option value="支出">支出</option><option value="収入">収入</option><option value="貯蓄">貯蓄</option></select>
+          <button id="add-category" class="btn-add" type="button">追加</button>
+        </div>
+        <ul id="category-list" class="cat-list"></ul>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>固定費（毎月の定期項目）</span></div>
+        <div id="recurring-list" class="rec-list"></div>
+        <div class="rec-form">
+          <input type="text" id="rec-name" placeholder="名称 (例: 家賃)">
+          <input type="text" id="rec-store" placeholder="店名/支払先 (任意)">
+          <select id="rec-category" class="rec-cat"></select>
+          <input type="number" id="rec-price" inputmode="numeric" placeholder="金額">
+          <input type="number" id="rec-day" inputmode="numeric" min="1" max="31" placeholder="日(1-31)" value="1">
+          <select id="rec-type" class="type-select"><option value="支出">支出</option><option value="収入">収入</option><option value="貯蓄">貯蓄</option></select>
+          <button id="add-recurring" class="btn-add" type="button">追加</button>
+        </div>
+        <div class="rec-actions">
+          <button id="apply-recurring" class="btn-secondary" type="button">今月分を今すぐ計上</button>
+          <button id="toggle-trigger" class="btn-secondary" type="button">毎月自動計上：—</button>
+        </div>
+        <div id="recurring-log" class="rec-log"></div>
+        <div id="recurring-msg" class="msg"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>テーマカラー</span></div>
+        <div id="theme-picker" class="theme-picker"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>金額の表示</span></div>
+        <div class="seg" id="unit-toggle">
+          <button class="seg-btn active" data-unit="yen">円（正確）</button>
+          <button class="seg-btn" data-unit="man">万（概算）</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>表示モード</span></div>
+        <div class="seg" id="mode-toggle">
+          <button class="seg-btn" data-mode="auto">自動</button>
+          <button class="seg-btn" data-mode="light">ライト</button>
+          <button class="seg-btn" data-mode="dark">ダーク</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>データ操作</span></div>
+        <button id="export-csv" class="btn-secondary" type="button">⬇ CSVをダウンロード（書き出し）</button>
+        <div class="hint" style="margin:-2px 0 10px;">全データをCSVファイルとして端末に保存します（Excel等で開けます）。</div>
+        <button id="email-csv" class="btn-secondary" type="button">📧 CSVを自分にメール送信</button>
+        <div class="hint" style="margin:-2px 0 10px;">iPhoneでダウンロードできない場合はこちら（自分のGmail宛に添付送信）。</div>
+        <button id="backup" class="btn-secondary" type="button">🗂 バックアップを作成</button>
+        <div class="hint" style="margin:-2px 0 0;">現在のDBを、同じスプレッドシート内に「Backup_日時」という別タブとして複製します（消える前の控え）。</div>
+        <div id="manage-msg" class="msg"></div>
+      </div>
+    </section>
+
+    <!-- ===== クレジット/引き落とし管理 画面 ===== -->
+    <section id="debit-view" class="tabpanel">
+      <div class="debit-month">
+        <button id="dm-prev" class="dm-nav" type="button">◀</button>
+        <span id="dm-label" class="dm-label">—</span>
+        <button id="dm-next" class="dm-nav" type="button">▶</button>
+      </div>
+
+      <div class="card debit-summary">
+        <div class="ds-label">この月の引き落とし合計</div>
+        <strong id="dm-total" class="ds-total">¥0</strong>
+        <div id="dm-count" class="hint"></div>
+      </div>
+
+      <div class="card debit-payday">
+        <div class="dp-row">
+          <label>給料日</label>
+          <input id="d-payday" type="number" inputmode="numeric" min="1" max="31"><span>日</span>
+          <span class="dp-after">給料日以降の引落 <b id="dp-after-total">¥0</b></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>引き落とし一覧</span></div>
+        <div id="debit-list"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>項目を追加</span></div>
+        <div class="debit-form">
+          <input id="d-name" type="text" placeholder="名称（例: ○○カード / 家賃）">
+          <div class="df-row">
+            <input id="d-day" type="number" inputmode="numeric" min="1" max="31" placeholder="引落日(1-31)">
+            <select id="d-type"><option value="fixed">固定金額</option><option value="variable">毎月入力</option></select>
+          </div>
+          <input id="d-amount" type="number" inputmode="numeric" placeholder="金額（固定の場合）">
+          <button id="d-add" class="btn-primary" type="button">追加</button>
+        </div>
+        <div class="hint" style="margin-top:8px;">「毎月入力」は金額が毎月変わる項目用。一覧で月ごとに金額を入力できます。</div>
+      </div>
+
+      <div class="card">
+        <div class="card-head"><span>データ</span></div>
+        <button id="debit-export" class="btn-secondary" type="button">⬇ 引き落としデータをCSV保存</button>
+        <div class="hint" style="margin:-2px 0 0;">設定と毎月の金額を書き出します（バックアップ用）。データはGoogle側に自動保存され消えません。</div>
+        <div id="debit-msg" class="msg"></div>
+      </div>
+    </section>
+
+    <!-- 通信失敗時のリトライバナー -->
+    <div id="retry-bar" class="retry-bar hidden">
+      <span id="retry-text">通信に失敗しました</span>
+      <button id="retry-btn" type="button">再試行</button>
+      <button id="retry-close" type="button">✕</button>
+    </div>
+
+    <footer class="app-footer">家計簿アプリ <span id="app-version">—</span></footer>
+
+    <!-- 入力テンプレート -->
+    <div id="tpl-modal" class="sheet-modal hidden">
+      <div class="sheet-box">
+        <div class="sheet-head"><span>入力テンプレート</span><button id="tpl-close" class="link">閉じる</button></div>
+        <div id="tpl-list" class="tpl-list"></div>
+        <button id="tpl-save" class="btn-primary" type="button">＋ 現在の明細をテンプレ保存</button>
+      </div>
+    </div>
+
+    <!-- 電卓 -->
+    <div id="calc-modal" class="calc-modal hidden">
+      <div class="calc-box">
+        <div id="calc-display" class="calc-display">0</div>
+        <div class="calc-keys">
+          <button data-k="C" class="ck-fn">C</button>
+          <button data-k="back" class="ck-fn">⌫</button>
+          <button data-k="/" class="ck-op">÷</button>
+          <button data-k="*" class="ck-op">×</button>
+          <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+          <button data-k="-" class="ck-op">−</button>
+          <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+          <button data-k="+" class="ck-op">＋</button>
+          <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+          <button data-k="=" class="ck-eq">＝</button>
+          <button data-k="0">0</button><button data-k=".">.</button>
+          <button data-k="cancel" class="ck-fn">閉じる</button>
+          <button data-k="ok" class="ck-ok">入力</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="snackbar" class="snackbar hidden"><span id="snack-icon"></span><span id="snack-text"></span></div>
+    <div id="loading" class="loading hidden"><div class="spinner"></div></div>
+  </div>
+
+<script>
+// ====== 状態 ======
+var CATEGORIES = [];
+var ITEM_TO_CATEGORY = {};
+var STORES = [];
+var CURRENT_TYPE = '支出';
+var CAT_SORT = '設定順';
+var ANALYTICS = null;
+var TRIGGER_ON = false;
+var DONUT_COLORS = ['#d32f2f','#f57c00','#fbc02d','#388e3c','#0288d1','#7b1fa2','#c2185b','#5d4037','#455a64','#00897b'];
+var THEMES = {
+  green:    { label: '緑',     primary: '#2e7d32', dark: '#1b5e20' },
+  blue:     { label: '青',     primary: '#1565c0', dark: '#0d47a1' },
+  teal:     { label: 'ティール', primary: '#00897b', dark: '#00695c' },
+  purple:   { label: '紫',     primary: '#6a1b9a', dark: '#4a148c' },
+  pink:     { label: 'ピンク',  primary: '#c2185b', dark: '#880e4f' },
+  orange:   { label: 'オレンジ', primary: '#ef6c00', dark: '#e65100' },
+  graphite: { label: 'グレー',  primary: '#455a64', dark: '#263238' }
+};
+function applyTheme(key) {
+  var t = THEMES[key] || THEMES.green;
+  var root = document.documentElement;
+  root.style.setProperty('--primary', t.primary);
+  root.style.setProperty('--primary-d', t.dark);
+  try { localStorage.setItem('kakeibo_theme', key); } catch (e) {}
+  document.querySelectorAll('#theme-picker .sw').forEach(function (s) { s.classList.toggle('on', s.getAttribute('data-key') === key); });
+}
+function renderThemePicker() {
+  var wrap = document.getElementById('theme-picker');
+  if (!wrap) return;
+  var cur = '';
+  try { cur = localStorage.getItem('kakeibo_theme') || 'green'; } catch (e) { cur = 'green'; }
+  wrap.innerHTML = Object.keys(THEMES).map(function (k) {
+    var t = THEMES[k];
+    return '<button class="sw' + (k === cur ? ' on' : '') + '" data-key="' + k + '" style="background:' + t.primary + '" title="' + t.label + '"></button>';
+  }).join('');
+  wrap.querySelectorAll('.sw').forEach(function (s) { s.addEventListener('click', function () { applyTheme(s.getAttribute('data-key')); }); });
+}
+function loadTheme() {
+  var key = 'green';
+  try { key = localStorage.getItem('kakeibo_theme') || 'green'; } catch (e) {}
+  applyTheme(key);
+}
+
+// ====== 通信ヘルパー (リトライ対応 = 機能15) ======
+function serverCall(fnName, args, onSuccess, onError) {
+  showLoading(true);
+  var runner = google.script.run
+    .withSuccessHandler(function (r) { showLoading(false); hideRetry(); if (onSuccess) onSuccess(r); })
+    .withFailureHandler(function (e) {
+      showLoading(false);
+      if (onError) onError(e);
+      showRetry((e && e.message) || '通信エラー', function () { serverCall(fnName, args, onSuccess, onError); });
+    });
+  runner[fnName].apply(runner, args || []);
+}
+function showRetry(msg, retryFn) {
+  document.getElementById('retry-text').textContent = '通信失敗: ' + msg;
+  var bar = document.getElementById('retry-bar');
+  bar.classList.remove('hidden');
+  document.getElementById('retry-btn').onclick = function () { hideRetry(); retryFn(); };
+}
+function hideRetry() { document.getElementById('retry-bar').classList.add('hidden'); }
+
+// ====== 初期化 ======
+document.addEventListener('DOMContentLoaded', function () {
+  loadTheme(); renderThemePicker(); loadUnit(); loadThemeMode();
+  document.querySelectorAll('#unit-toggle .seg-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-unit') === AMOUNT_UNIT);
+    b.addEventListener('click', function () { setUnit(b.getAttribute('data-unit')); });
+  });
+  document.querySelectorAll('#mode-toggle .seg-btn').forEach(function (b) {
+    b.addEventListener('click', function () { applyThemeMode(b.getAttribute('data-mode')); });
+  });
+  serverCall('getInitialData', [], onInit);
+  setupTabs(); setupTypeSeg();
+  document.getElementById('add-row').addEventListener('click', function () { addRow(); });
+  document.getElementById('add-row-bottom').addEventListener('click', function () { addRow(); var r = document.querySelector('#rows .row:last-child .r-item'); if (r) r.focus(); });
+  document.getElementById('recall-last').addEventListener('click', recallLast);
+  attachSuggest(document.getElementById('store'), function () { return STORES; });
+  document.getElementById('calc-printed').addEventListener('click', function () { openCalc(document.getElementById('printed-total')); });
+  document.querySelector('#calc-modal .calc-keys').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (b) calcKey(b.getAttribute('data-k'));
+  });
+  document.getElementById('calc-modal').addEventListener('click', function (ev) { if (ev.target.id === 'calc-modal') closeCalc(); });
+  document.getElementById('scan-receipt').addEventListener('click', function () { document.getElementById('receipt-file').click(); });
+  document.getElementById('receipt-file').addEventListener('change', onReceiptSelected);
+  document.getElementById('submit').addEventListener('click', submitReceipt);
+  document.getElementById('printed-total').addEventListener('input', recalcTotal);
+  document.getElementById('reload-history').addEventListener('click', loadHistory);
+  document.getElementById('h-search').addEventListener('input', applyHistoryFilter);
+  document.getElementById('h-month').addEventListener('change', loadHistory);
+  document.getElementById('h-type').addEventListener('change', applyHistoryFilter);
+  document.getElementById('h-sort').addEventListener('change', applyHistoryFilter);
+  document.getElementById('add-category').addEventListener('click', onAddCategory);
+  document.getElementById('export-csv').addEventListener('click', onExportCsv);
+  document.getElementById('email-csv').addEventListener('click', onEmailCsv);
+  document.getElementById('backup').addEventListener('click', onBackup);
+  document.getElementById('a-year').addEventListener('change', loadAnalytics);
+  document.getElementById('a-month').addEventListener('change', loadAnalytics);
+  document.getElementById('cat-sort').addEventListener('change', function () {
+    CAT_SORT = this.value;
+    if (ANALYTICS) { renderCategories(ANALYTICS.categories); renderYearCategories(ANALYTICS.yearCategories, ANALYTICS.year); }
+  });
+  document.getElementById('cat-breakdown').addEventListener('click', function (ev) {
+    var row = ev.target.closest('.cb-row'); if (!row) return;
+    toggleCatEntries(row);
+  });
+  document.querySelectorAll('.subtab').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('.subtab').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      var s = b.getAttribute('data-sub');
+      document.getElementById('sub-balance').classList.toggle('hidden', s !== 'balance');
+      document.getElementById('sub-saving').classList.toggle('hidden', s !== 'saving');
+    });
+  });
+  document.getElementById('add-recurring').addEventListener('click', onAddRecurring);
+  document.getElementById('apply-recurring').addEventListener('click', onApplyRecurring);
+  document.getElementById('toggle-trigger').addEventListener('click', onToggleTrigger);
+  document.getElementById('retry-close').addEventListener('click', hideRetry);
+  document.getElementById('h-preset-save').addEventListener('click', onSavePreset);
+  document.getElementById('h-preset-del').addEventListener('click', onDeletePreset);
+  document.getElementById('h-preset').addEventListener('change', onApplyPreset);
+  renderPresets();
+  document.getElementById('tpl-btn').addEventListener('click', openTplModal);
+  document.getElementById('tpl-close').addEventListener('click', function () { document.getElementById('tpl-modal').classList.add('hidden'); });
+  document.getElementById('tpl-save').addEventListener('click', onSaveTemplate);
+  document.getElementById('tpl-modal').addEventListener('click', function (ev) { if (ev.target.id === 'tpl-modal') ev.currentTarget.classList.add('hidden'); });
+  document.getElementById('mode-switch').addEventListener('click', function () {
+    switchMode(document.querySelector('.app').classList.contains('debit-mode') ? 'home' : 'debit');
+  });
+  document.getElementById('dm-prev').addEventListener('click', function () { shiftDebitMonth(-1); });
+  document.getElementById('dm-next').addEventListener('click', function () { shiftDebitMonth(1); });
+  document.getElementById('d-add').addEventListener('click', onAddDebit);
+  document.getElementById('debit-export').addEventListener('click', onExportDebits);
+  var pd = document.getElementById('d-payday');
+  pd.value = getPayday();
+  pd.addEventListener('change', function () {
+    var v = Math.min(31, Math.max(1, Number(pd.value) || 25));
+    pd.value = v; try { localStorage.setItem('kakeibo_payday', v); } catch (e) {}
+    if (DEBIT_DATA) renderDebitList();
+  });
+});
+
+function onInit(data) {
+  CATEGORIES = data.categories || [];
+  (data.suggestions || []).forEach(function (s) { ITEM_TO_CATEGORY[s.item] = s.category; });
+  STORES = data.stores || [];
+  TRIGGER_ON = !!data.triggerOn;
+  document.getElementById('scan-card').classList.toggle('hidden', !data.scanEnabled);
+  if (data.version) document.getElementById('app-version').textContent = data.version;
+  document.getElementById('date').value = data.today;
+  refreshItemDatalist(); renderCategoryList(); renderRecurringForm();
+  updateTriggerButton();
+  setupPeriodSelectors(data.year, data.month);
+  renderMiniSummary(data.monthSummary);
+  setupHistoryMonths(data.year, data.month);
+  addRow();
+}
+
+// 入力画面の今月ミニサマリー
+function renderMiniSummary(s) {
+  s = s || { income: 0, expense: 0, balance: 0 };
+  document.getElementById('ms-income').textContent = yen(s.income);
+  document.getElementById('ms-expense').textContent = yen(s.expense);
+  var bal = document.getElementById('ms-balance');
+  bal.textContent = (s.balance >= 0 ? '' : '−') + yen(Math.abs(s.balance));
+  bal.classList.toggle('neg', s.balance < 0);
+}
+function refreshMiniSummary() {
+  // 入力画面は常に「今月」を表示(軽量なので静かに更新)
+  var now = new Date();
+  google.script.run.withSuccessHandler(renderMiniSummary).getMonthSummary(now.getFullYear(), now.getMonth() + 1);
+}
+
+// 「前回と同じ」
+function recallLast() {
+  serverCall('getLastReceipt', [], function (r) {
+    if (!r || !r.items.length) { toast('', '前回の登録がありません', true); return; }
+    // 種別を合わせる
+    var seg = document.querySelector('#type-seg .seg-btn[data-type="' + r.type + '"]');
+    if (seg) seg.click();
+    document.getElementById('store').value = r.store || '';
+    document.getElementById('rows').innerHTML = '';
+    r.items.forEach(function (it) { addRow(it); });
+    recalcTotal();
+    toast('', '前回の明細を呼び出しました', false);
+  });
+}
+
+// ====== レシート読み取り (Gemini) ======
+function onReceiptSelected(ev) {
+  var file = ev.target.files && ev.target.files[0];
+  ev.target.value = ''; // 同じ写真を再選択できるようにリセット
+  if (!file) return;
+  toast('', 'レシートを読み取っています…', false);
+  resizeToBase64(file, 1500, function (base64) {
+    // 専用ハンドラ(自動再試行はしない=429で枠を無駄に消費しないため)
+    showLoading(true);
+    google.script.run
+      .withSuccessHandler(function (r) { showLoading(false); applyScannedReceipt(r); })
+      .withFailureHandler(function (e) { showLoading(false); handleScanError(e); })
+      .scanReceipt(base64, 'image/jpeg');
+  });
+}
+function handleScanError(e) {
+  var msg = (e && e.message) || '';
+  if (msg.indexOf('429') >= 0) {
+    toast('', '読み取りの回数制限です。1分ほど待ってから、もう一度撮ってください', true);
+  } else if (msg.indexOf('APIキー') >= 0) {
+    toast('', 'APIキーが未設定です（管理者設定）', true);
+  } else {
+    toast('', '読み取り失敗: ' + msg, true);
+  }
+}
+
+// 画像を縮小してJPEGのbase64(ヘッダ無し)に変換。通信量と速度を抑える。
+function resizeToBase64(file, maxSize, cb) {
+  var img = new Image();
+  var url = URL.createObjectURL(file);
+  img.onload = function () {
+    var w = img.width, h = img.height;
+    var scale = Math.min(1, maxSize / Math.max(w, h));
+    var cw = Math.round(w * scale), ch = Math.round(h * scale);
+    var canvas = document.createElement('canvas');
+    canvas.width = cw; canvas.height = ch;
+    canvas.getContext('2d').drawImage(img, 0, 0, cw, ch);
+    URL.revokeObjectURL(url);
+    var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    cb(dataUrl.split(',')[1]); // base64本体のみ
+  };
+  img.onerror = function () { URL.revokeObjectURL(url); toast('', '画像を読み込めませんでした', true); };
+  img.src = url;
+}
+
+function applyScannedReceipt(r) {
+  if (!r || !r.items || !r.items.length) { toast('', '明細を読み取れませんでした。撮り直してください', true); return; }
+  var seg = document.querySelector('#type-seg .seg-btn[data-type="' + r.type + '"]');
+  if (seg) seg.click();
+  if (r.date) document.getElementById('date').value = r.date;
+  document.getElementById('store').value = r.store || '';
+  document.getElementById('rows').innerHTML = '';
+  r.items.forEach(function (it) {
+    if (it.category) ensureItemCat(it.item, it.category);
+    addRow(it);
+  });
+  // 読み取った合計を検算欄に入れて、ズレを可視化
+  if (r.total) document.getElementById('printed-total').value = r.total;
+  recalcTotal();
+  toast('', r.items.length + '件を読み取りました。内容を確認して登録してください', false);
+}
+function ensureItemCat(item, cat) { if (item && cat) ITEM_TO_CATEGORY[item] = cat; }
+
+// ====== タブ ======
+function setupTabs() {
+  var tabs = document.querySelectorAll('.tab');
+  tabs.forEach(function (t) {
+    t.addEventListener('click', function () {
+      tabs.forEach(function (x) { x.classList.remove('active'); });
+      t.classList.add('active');
+      var target = t.getAttribute('data-tab');
+      ['input', 'history', 'analysis', 'manage'].forEach(function (name) {
+        document.getElementById('tab-' + name).classList.toggle('hidden', name !== target);
+      });
+      if (target === 'analysis') loadAnalytics();
+      if (target === 'history') loadHistory();
+      if (target === 'manage') loadRecurring();
+    });
+  });
+}
+
+// ====== 収入/支出トグル ======
+function setupTypeSeg() {
+  document.querySelectorAll('#type-seg .seg-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.querySelectorAll('#type-seg .seg-btn').forEach(function (x) { x.classList.remove('active'); });
+      b.classList.add('active');
+      CURRENT_TYPE = b.getAttribute('data-type');
+      var labels = { '収入': '支払元（任意）', '貯蓄': '預け先（任意）' };
+      var phs = { '収入': '例: 給与 / ボーナス', '貯蓄': '例: 銀行 / 投資' };
+      document.getElementById('store-label').textContent = labels[CURRENT_TYPE] || '店名';
+      document.getElementById('store').placeholder = phs[CURRENT_TYPE] || '例: ○○スーパー';
+      document.querySelectorAll('#rows .row .r-cat').forEach(function (sel) { var cur = sel.value; sel.innerHTML = categoryOptions(cur); });
+      var app = document.querySelector('.app');
+      app.classList.toggle('income-mode', CURRENT_TYPE === '収入');
+      app.classList.toggle('saving-mode', CURRENT_TYPE === '貯蓄');
+    });
+  });
+}
+
+// ====== 明細行 ======
+function addRow(preset) {
+  preset = preset || {};
+  var row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML =
+    '<input class="r-item" placeholder="商品名" value="' + esc(preset.item || '') + '">' +
+    '<select class="r-cat">' + categoryOptions(preset.category) + '</select>' +
+    '<input class="r-qty" type="number" inputmode="decimal" min="0" placeholder="個数" value="' + (preset.qty || 1) + '">' +
+    '<div class="price-wrap"><input class="r-price" type="number" inputmode="decimal" min="0" placeholder="単価" value="' + (preset.price || '') + '">' +
+    '<button class="calc-btn" type="button" tabindex="-1">🧮</button></div>' +
+    '<span class="r-sub">¥0</span><button class="r-del" type="button">×</button>' +
+    '<input class="r-note" placeholder="この商品の備考（任意）" value="' + esc(preset.note || '') + '">';
+  document.getElementById('rows').appendChild(row);
+  // 読み取り等で渡されたカテゴリが選択肢に無い場合も選べるようにする
+  if (preset.category) { var psel = row.querySelector('.r-cat'); ensureOption(psel, preset.category); psel.value = preset.category; }
+  var itemInput = row.querySelector('.r-item');
+  function fillCat() {
+    var cat = ITEM_TO_CATEGORY[itemInput.value.trim()];
+    if (cat) { var sel = row.querySelector('.r-cat'); ensureOption(sel, cat); sel.value = cat; }
+  }
+  itemInput.addEventListener('change', fillCat);
+  attachSuggest(itemInput, function () { return Object.keys(ITEM_TO_CATEGORY); }, fillCat);
+  row.querySelector('.r-qty').addEventListener('input', recalcTotal);
+  row.querySelector('.r-price').addEventListener('input', recalcTotal);
+  row.querySelector('.calc-btn').addEventListener('click', function () { openCalc(row.querySelector('.r-price')); });
+  row.querySelector('.r-del').addEventListener('click', function () { row.remove(); recalcTotal(); });
+  recalcTotal();
+}
+function typeOptions(sel) { return ['支出', '収入', '貯蓄'].map(function (t) { return '<option value="' + t + '"' + (t === sel ? ' selected' : '') + '>' + t + '</option>'; }).join(''); }
+function categoryOptions(selected) { return categoryOptionsForType(CURRENT_TYPE, selected); }
+function categoryOptionsForType(type, selected) {
+  var opts = '<option value="">カテゴリ</option>';
+  CATEGORIES.filter(function (c) { return c.type === type; }).forEach(function (c) {
+    opts += '<option value="' + esc(c.name) + '"' + (c.name === selected ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+  });
+  // 既存の選択値が一覧に無い場合も保持(古いデータ対策)
+  if (selected && !CATEGORIES.some(function (c) { return c.type === type && c.name === selected; })) {
+    opts += '<option value="' + esc(selected) + '" selected>' + esc(selected) + '</option>';
+  }
+  return opts;
+}
+function ensureOption(sel, value) {
+  for (var i = 0; i < sel.options.length; i++) if (sel.options[i].value === value) return;
+  var o = document.createElement('option'); o.value = value; o.textContent = value; sel.appendChild(o);
+}
+function refreshItemDatalist() {
+  document.getElementById('item-list').innerHTML =
+    Object.keys(ITEM_TO_CATEGORY).map(function (item) { return '<option value="' + esc(item) + '">'; }).join('');
+}
+
+// ====== 合計 & 検算 ======
+function recalcTotal() {
+  var total = 0;
+  document.querySelectorAll('#rows .row').forEach(function (row) {
+    var sub = (Number(row.querySelector('.r-qty').value) || 0) * (Number(row.querySelector('.r-price').value) || 0);
+    total += sub; row.querySelector('.r-sub').textContent = yen(sub);
+  });
+  document.getElementById('calc-total').textContent = yen(total);
+  var printed = Number(document.getElementById('printed-total').value);
+  var msg = document.getElementById('verify-msg');
+  if (!printed) { msg.textContent = ''; msg.className = 'verify'; }
+  else if (printed === total) { msg.textContent = '✓ レシート合計と一致'; msg.className = 'verify ok'; }
+  else {
+    var diff = total - printed;
+    msg.textContent = '⚠ 不一致: 差額 ' + yen(Math.abs(diff)) + (diff > 0 ? '（入力が多い）' : '（入力が少ない）');
+    msg.className = 'verify ng';
+  }
+  return total;
+}
+
+// ====== 登録 ======
+function submitReceipt() {
+  var items = [];
+  document.querySelectorAll('#rows .row').forEach(function (row) {
+    var item = row.querySelector('.r-item').value.trim();
+    if (!item) return;
+    items.push({ item: item, category: row.querySelector('.r-cat').value,
+      qty: Number(row.querySelector('.r-qty').value) || 0, price: Number(row.querySelector('.r-price').value) || 0,
+      note: row.querySelector('.r-note').value.trim() });
+  });
+  if (!items.length) { toast('input-msg', '明細を入力してください', true); return; }
+  var total = recalcTotal(), printed = Number(document.getElementById('printed-total').value);
+  if (printed && printed !== total &&
+      !confirm('レシート合計と一致していません（差額 ' + yen(Math.abs(total - printed)) + '）。\nこのまま登録しますか？')) return;
+  var payload = { date: document.getElementById('date').value, store: document.getElementById('store').value, type: CURRENT_TYPE, note: document.getElementById('note').value, items: items };
+  doSubmit(payload, items, false);
+}
+function doSubmit(payload, items, force) {
+  serverCall('submitReceipt', [payload, force], function (res) {
+    if (res && res.duplicate) {
+      if (confirm('同じ日付・店・合計（' + yen(res.total) + '）の登録が既にあります。\n重複して登録しますか？')) doSubmit(payload, items, true);
+      return;
+    }
+    toast('', '登録しました (' + res.count + '件)', false);
+    items.forEach(function (it) { ITEM_TO_CATEGORY[it.item] = it.category; });
+    var st = (payload.store || '').trim();
+    if (st && STORES.indexOf(st) === -1) STORES.unshift(st);
+    refreshItemDatalist();
+    document.getElementById('rows').innerHTML = '';
+    document.getElementById('printed-total').value = '';
+    document.getElementById('note').value = '';
+    addRow(); recalcTotal();
+    refreshMiniSummary();
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // 入力後に先頭へ
+  });
+}
+
+// ====== 履歴 (機能1: 編集・削除 + 検索/絞り込み) ======
+var ALL_ENTRIES = [];
+// 月を選んでいればその月だけ取得(件数制限なし)、全期間なら直近500件
+function loadHistory() {
+  var ym = document.getElementById('h-month').value;
+  if (ym) serverCall('getEntriesByMonth', [ym], function (e) { ALL_ENTRIES = e; applyHistoryFilter(); });
+  else serverCall('getEntries', [500], function (e) { ALL_ENTRIES = e; applyHistoryFilter(); });
+}
+
+// 直近36か月＋全期間を選べるようにする(当月を初期選択)
+function setupHistoryMonths(year, month) {
+  var sel = document.getElementById('h-month');
+  var opts = '';
+  var d = new Date(year, month, 1); // 翌月から開始
+  for (var i = 0; i < 37; i++) {    // 翌月＋当月＋過去35か月
+    var y = d.getFullYear(), m = d.getMonth() + 1;
+    var k = y + '-' + ('0' + m).slice(-2);
+    opts += '<option value="' + k + '">' + y + '年' + m + '月</option>';
+    d.setMonth(d.getMonth() - 1);
+  }
+  sel.innerHTML = opts + '<option value="">全期間(直近500件)</option>';
+  sel.value = year + '-' + ('0' + month).slice(-2);
+}
+var SEARCH_TIMER = null, SEARCH_CACHE = { q: null, res: [] };
+// 検索語があれば全期間横断検索、無ければ選択月のデータを表示
+function applyHistoryFilter() {
+  var q = document.getElementById('h-search').value.trim();
+  if (q) {
+    if (SEARCH_CACHE.q === q) { renderFromSource(SEARCH_CACHE.res, true); return; }
+    clearTimeout(SEARCH_TIMER);
+    SEARCH_TIMER = setTimeout(function () {
+      serverCall('searchEntries', [q], function (res) { SEARCH_CACHE = { q: q, res: res }; renderFromSource(res, true); });
+    }, 300);
+  } else {
+    renderFromSource(ALL_ENTRIES, false);
+  }
+}
+function renderFromSource(entries, isSearch) {
+  var type = document.getElementById('h-type').value;
+  var filtered = entries.filter(function (e) { return !type || e.type === type; });
+  document.getElementById('hist-count').textContent = filtered.length + ' 件' + (isSearch ? '（全期間検索）' : '');
+  renderHistory(filtered);
+}
+
+// 同じレシートID単位でまとめて表示
+function renderHistory(entries) {
+  var wrap = document.getElementById('history-list');
+  if (!entries.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-ico">🧾</div><div>該当する履歴がありません</div></div>';
+    return;
+  }
+  // レシートIDでグループ化(出現順を保持)
+  var groups = [], byId = {}, seq = 0;
+  entries.forEach(function (e) {
+    var id = e.receiptId || ('row-' + e.sheetRow); // IDが無い古いデータは単独扱い
+    var g = byId[id];
+    if (!g) { g = byId[id] = { id: e.receiptId || '', date: e.date, store: e.store, type: e.type, note: e.note || '', items: [], seq: seq++ }; groups.push(g); }
+    g.items.push(e);
+  });
+
+  // 並べ替え(日付→登録順)
+  var asc = document.getElementById('h-sort').value === 'asc';
+  groups.sort(function (a, b) {
+    if (a.date !== b.date) return asc ? (a.date < b.date ? -1 : 1) : (a.date < b.date ? 1 : -1);
+    return asc ? (a.seq - b.seq) : (b.seq - a.seq);
+  });
+
+  wrap.innerHTML = '';
+  var lastDate = null;
+  groups.forEach(function (g) {
+    if (g.date !== lastDate) { var h = document.createElement('div'); h.className = 'hist-date'; h.textContent = g.date; wrap.appendChild(h); lastDate = g.date; }
+    var total = g.items.reduce(function (s, it) { return s + it.subtotal; }, 0);
+    var sign = g.type === '収入' ? '+' : (g.type === '貯蓄' ? '貯 ' : '-');
+    var card = document.createElement('div');
+    card.className = 'rcpt ' + (g.type === '収入' ? 'in' : (g.type === '貯蓄' ? 'sv' : 'ex'));
+
+    var head = document.createElement('div');
+    head.className = 'rcpt-head';
+    head.innerHTML =
+      '<div class="rh-left">' +
+        '<div class="rh-store-line"><span class="rh-store">' + esc(g.store || '(店名なし)') + '</span>' +
+        '<button class="link rh-edit" title="店名を編集">✎</button></div>' +
+        '<span class="rh-meta">' + g.type + '・' + g.items.length + '件' + (g.note ? '　📝' + esc(g.note) : '') + '</span>' +
+      '</div>' +
+      '<span class="rh-total">' + sign + yen(total) + '</span>';
+    card.appendChild(head);
+
+    var storeEdit = document.createElement('div');
+    storeEdit.className = 'rh-store-edit hidden';
+    storeEdit.innerHTML =
+      '<input class="rse-date" type="date" value="' + esc(g.date) + '">' +
+      '<input class="rse-input" type="text" placeholder="店名" value="' + esc(g.store) + '">' +
+      '<input class="rse-note" type="text" placeholder="備考" value="' + esc(g.note) + '">' +
+      '<button class="btn-add rse-save">保存</button>' +
+      '<button class="link rse-cancel">閉じる</button>';
+    head.querySelector('.rh-edit').addEventListener('click', function () { storeEdit.classList.toggle('hidden'); });
+    storeEdit.querySelector('.rse-cancel').addEventListener('click', function () { storeEdit.classList.add('hidden'); });
+    storeEdit.querySelector('.rse-save').addEventListener('click', function () {
+      var newStore = storeEdit.querySelector('.rse-input').value;
+      var newDate = storeEdit.querySelector('.rse-date').value;
+      var newNote = storeEdit.querySelector('.rse-note').value;
+      var rows = g.items.map(function (e) { return e.sheetRow; });
+      serverCall('updateReceiptMeta', [g.id, newStore, newDate, rows, newNote], function () { toast('', 'レシート情報を更新しました', false); loadHistory(); refreshMiniSummary(); });
+    });
+    card.appendChild(storeEdit);
+
+    var itemsWrap = document.createElement('div');
+    itemsWrap.className = 'rcpt-items';
+    g.items.forEach(function (e) {
+      var it = document.createElement('div');
+      it.className = 'ri2';
+      it.innerHTML =
+        '<div class="ri2-view">' +
+          '<span class="ri2-name">' + esc(e.item) + (e.itemNote ? '<small class="ri2-note">📝' + esc(e.itemNote) + '</small>' : '') + '</span>' +
+          '<span class="ri2-cat">' + esc(e.category || '-') + '</span>' +
+          '<span class="ri2-amt">' + sign + yen(e.subtotal) + '</span>' +
+          '<button class="link ri2-edit">編集</button>' +
+        '</div>' +
+        '<div class="hi-edit-form hidden">' +
+          '<input class="he-item" type="text" list="item-list" placeholder="商品名" value="' + esc(e.item) + '">' +
+          '<select class="he-cat">' + categoryOptionsForType(e.type, e.category) + '</select>' +
+          '<div class="he-row"><input class="he-qty" type="number" placeholder="個数" value="' + e.qty + '">' +
+          '<input class="he-price" type="number" placeholder="単価" value="' + e.price + '">' +
+          '<select class="he-type">' + typeOptions(e.type) + '</select></div>' +
+          '<input class="he-note" type="text" placeholder="商品の備考（任意）" value="' + esc(e.itemNote || '') + '">' +
+          '<div class="he-actions"><button class="btn-add he-save">保存</button>' +
+          '<button class="link danger he-del">この明細を削除</button>' +
+          '<button class="link he-cancel">閉じる</button></div>' +
+        '</div>';
+      it.querySelector('.ri2-edit').addEventListener('click', function () { it.querySelector('.hi-edit-form').classList.toggle('hidden'); });
+      it.querySelector('.he-cancel').addEventListener('click', function () { it.querySelector('.hi-edit-form').classList.add('hidden'); });
+      // 商品名を入力履歴から選ぶとカテゴリを自動補完
+      var heItem = it.querySelector('.he-item'), heCat = it.querySelector('.he-cat'), heType = it.querySelector('.he-type');
+      heItem.addEventListener('change', function () {
+        var cat = ITEM_TO_CATEGORY[heItem.value.trim()];
+        if (cat) { heCat.innerHTML = categoryOptionsForType(heType.value, cat); heCat.value = cat; }
+      });
+      // 種別を変えたらカテゴリ候補を入れ替え
+      heType.addEventListener('change', function () { heCat.innerHTML = categoryOptionsForType(heType.value, heCat.value); });
+      it.querySelector('.he-save').addEventListener('click', function () {
+        var obj = {
+          date: e.date, store: e.store,
+          item: it.querySelector('.he-item').value, category: it.querySelector('.he-cat').value,
+          qty: Number(it.querySelector('.he-qty').value) || 0, price: Number(it.querySelector('.he-price').value) || 0,
+          type: it.querySelector('.he-type').value, itemNote: it.querySelector('.he-note').value
+        };
+        if (!obj.item.trim()) { toast('', '商品名を入力してください', true); return; }
+        serverCall('updateEntry', [e.sheetRow, obj], function () { toast('', '更新しました', false); loadHistory(); refreshMiniSummary(); });
+      });
+      it.querySelector('.he-del').addEventListener('click', function () {
+        if (!confirm('「' + e.item + '」を削除しますか？')) return;
+        serverCall('deleteEntry', [e.sheetRow], function () { toast('', '削除しました', false); loadHistory(); refreshMiniSummary(); });
+      });
+      itemsWrap.appendChild(it);
+    });
+    card.appendChild(itemsWrap);
+
+    // レシートごと削除(IDがある＝まとめて登録された分のみ)
+    if (g.id) {
+      var del = document.createElement('button');
+      del.className = 'link danger rcpt-del';
+      del.textContent = 'このレシートをまとめて削除';
+      del.addEventListener('click', function () {
+        if (!confirm('このレシート（' + g.items.length + '件）をまとめて削除しますか？')) return;
+        serverCall('deleteReceipt', [g.id], function () { toast('', '削除しました', false); loadHistory(); refreshMiniSummary(); });
+      });
+      card.appendChild(del);
+    }
+    wrap.appendChild(card);
+  });
+}
+
+// ====== 分析 ======
+function setupPeriodSelectors(year, month) {
+  var ys = document.getElementById('a-year'), current = new Date().getFullYear();
+  ys.innerHTML = '';
+  for (var y = current; y >= current - 6; y--) ys.innerHTML += '<option value="' + y + '">' + y + '年</option>';
+  ys.value = year;
+  var ms = document.getElementById('a-month');
+  ms.innerHTML = '';
+  for (var m = 1; m <= 12; m++) ms.innerHTML += '<option value="' + m + '">' + m + '月</option>';
+  ms.value = month;
+}
+function loadAnalytics() {
+  var y = Number(document.getElementById('a-year').value), m = Number(document.getElementById('a-month').value);
+  serverCall('getAnalytics', [y, m], renderAnalytics);
+  google.script.run.withSuccessHandler(function (days) { renderCalendar(y, m, days); }).getDailyTotals(y, m);
+}
+
+// カレンダー(日別支出)
+function renderCalendar(year, month, days) {
+  days = days || {};
+  var first = new Date(year, month - 1, 1).getDay(); // 0=日
+  var total = new Date(year, month, 0).getDate();
+  var html = '';
+  for (var i = 0; i < first; i++) html += '<div class="cal-cell empty"></div>';
+  for (var d = 1; d <= total; d++) {
+    var rec = days[d];
+    var exp = rec ? rec.expense : 0, inc = rec ? rec.income : 0;
+    var amt = exp > 0 ? '<span class="cal-exp">' + kshort(exp) + '</span>' : '';
+    var incHtml = inc > 0 ? '<span class="cal-inc">+' + kshort(inc) + '</span>' : '';
+    var dow = (first + d - 1) % 7;
+    var cls = 'cal-cell' + (dow === 0 ? ' sun' : (dow === 6 ? ' sat' : '')) + (rec ? ' has' : '');
+    html += '<div class="' + cls + '" data-day="' + d + '"><span class="cal-d">' + d + '</span>' + amt + incHtml + '</div>';
+  }
+  var cal = document.getElementById('calendar');
+  cal.innerHTML = html;
+  cal.querySelectorAll('.cal-cell.has').forEach(function (cell) {
+    cell.addEventListener('click', function () { showDayDetail(year, month, Number(cell.getAttribute('data-day')), days[cell.getAttribute('data-day')]); });
+  });
+  document.getElementById('cal-day-detail').classList.add('hidden');
+}
+function showDayDetail(year, month, day, rec) {
+  var el = document.getElementById('cal-day-detail');
+  el.classList.remove('hidden');
+  el.innerHTML = '<b>' + month + '月' + day + '日</b>　支出 <span class="r">' + yen(rec.expense) + '</span>' +
+    (rec.income > 0 ? '　収入 <span class="b">' + yen(rec.income) + '</span>' : '');
+}
+function kshort(n) { return n >= 10000 ? (Math.round(n / 1000) / 10 + '万') : Math.round(n).toLocaleString(); }
+// 固定費の次回計上予定日(今月の該当日が過ぎていれば翌月)
+function nextRecurringDate(day) {
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth();
+  function make(yy, mm) { var dim = new Date(yy, mm + 1, 0).getDate(); return new Date(yy, mm, Math.min(day, dim)); }
+  var cand = make(y, m);
+  var todayMid = new Date(y, m, now.getDate());
+  if (cand < todayMid) { m += 1; if (m > 11) { m = 0; y += 1; } cand = make(y, m); }
+  return cand.getFullYear() + '/' + (cand.getMonth() + 1) + '/' + cand.getDate();
+}
+// カテゴリの並び替え(設定順/多い順/少ない順)
+function catAmt(c) { return (Number(c.income) || 0) + (Number(c.expense) || 0) + (Number(c.saving) || 0); }
+function catOrderIdx(name) { for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].name === name) return i; return 9999; }
+function sortCatList(list) {
+  var arr = list.slice();
+  if (CAT_SORT === '多い順') arr.sort(function (a, b) { return catAmt(b) - catAmt(a); });
+  else if (CAT_SORT === '少ない順') arr.sort(function (a, b) { return catAmt(a) - catAmt(b); });
+  else arr.sort(function (a, b) { return catOrderIdx(a.name) - catOrderIdx(b.name); });
+  return arr;
+}
+
+function renderAnalytics(a) {
+  ANALYTICS = a;
+  renderRatios(a);
+  document.getElementById('month-title').textContent = a.year + '年 ' + a.month + '月';
+  document.getElementById('year-title').textContent = a.year + '年（年間）';
+  setKpi('m-income', a.monthCur.income, a.monthPrev.income, false);
+  setKpi('m-expense', a.monthCur.expense, a.monthPrev.expense, true);
+  setKpi('m-saving', a.monthCur.saving, a.monthPrev.saving, false);
+  setKpi('m-balance', a.monthCur.balance, a.monthPrev.balance, false);
+  setKpi('y-income', a.yearCur.income, a.yearPrev.income, false);
+  setKpi('y-expense', a.yearCur.expense, a.yearPrev.expense, true);
+  setKpi('y-saving', a.yearCur.saving, a.yearPrev.saving, false);
+  setKpi('y-balance', a.yearCur.balance, a.yearPrev.balance, false);
+  renderTrendLine(a.trend);
+  renderTrend(a.trend);
+  renderDonut(a.categories);
+  renderCategories(a.categories);
+  renderYearCategories(a.yearCategories, a.year);
+  renderSavingTrend(a.trend);
+  renderSavingCategories(a.yearCategories, a.year);
+  renderSavingGoals(a.savingProgress);
+}
+// 前期比(収支・貯蓄の前月比・前年比 %)
+function renderRatios(a) {
+  function pct(cur, prev) {
+    if (prev === 0) return cur === 0 ? { t: '増減なし', c: 'flat' } : { t: '—', c: 'flat' };
+    var p = Math.round((cur - prev) / Math.abs(prev) * 100);
+    return { t: (p > 0 ? '+' : '') + p + '%', c: p > 0 ? 'good' : (p < 0 ? 'bad' : 'flat') };
+  }
+  function row(label, curM, prevM, curY, prevY) {
+    var m = pct(curM, prevM), y = pct(curY, prevY);
+    return '<div class="ratio-row"><span class="ratio-label">' + label + '</span>' +
+      '<span class="ratio-cell">前月比 <b class="' + m.c + '">' + m.t + '</b></span>' +
+      '<span class="ratio-cell">前年比 <b class="' + y.c + '">' + y.t + '</b></span></div>';
+  }
+  document.getElementById('ratio-body').innerHTML =
+    row('収支', a.monthCur.balance, a.monthPrev.balance, a.yearCur.balance, a.yearPrev.balance) +
+    row('貯蓄', a.monthCur.saving, a.monthPrev.saving, a.yearCur.saving, a.yearPrev.saving);
+}
+
+// ====== 検索条件の保存(履歴) ======
+function getPresets() { try { return JSON.parse(localStorage.getItem('kakeibo_hist_presets') || '[]'); } catch (e) { return []; } }
+function savePresets(a) { try { localStorage.setItem('kakeibo_hist_presets', JSON.stringify(a)); } catch (e) {} }
+function renderPresets() {
+  var sel = document.getElementById('h-preset'), arr = getPresets();
+  sel.innerHTML = '<option value="">★保存した条件…</option>' + arr.map(function (p, i) { return '<option value="' + i + '">' + esc(p.name) + '</option>'; }).join('');
+}
+function onSavePreset() {
+  var name = prompt('この検索条件の名前'); if (name == null) return; name = name.trim(); if (!name) return;
+  var arr = getPresets();
+  arr.push({ name: name, q: document.getElementById('h-search').value, month: document.getElementById('h-month').value, type: document.getElementById('h-type').value, sort: document.getElementById('h-sort').value });
+  savePresets(arr); renderPresets(); toast('', '検索条件を保存しました', false);
+}
+function onApplyPreset() {
+  var i = document.getElementById('h-preset').value; if (i === '') return;
+  var p = getPresets()[Number(i)]; if (!p) return;
+  document.getElementById('h-search').value = p.q || '';
+  if (p.month !== undefined) document.getElementById('h-month').value = p.month;
+  document.getElementById('h-type').value = p.type || '';
+  document.getElementById('h-sort').value = p.sort || 'desc';
+  loadHistory();
+}
+function onDeletePreset() {
+  var i = document.getElementById('h-preset').value;
+  if (i === '') { toast('', '削除する条件を選んでください', true); return; }
+  var arr = getPresets(); arr.splice(Number(i), 1); savePresets(arr); renderPresets(); toast('', '削除しました', false);
+}
+
+// ====== 入力テンプレート ======
+function getTemplates() { try { return JSON.parse(localStorage.getItem('kakeibo_templates') || '[]'); } catch (e) { return []; } }
+function saveTemplates(a) { try { localStorage.setItem('kakeibo_templates', JSON.stringify(a)); } catch (e) {} }
+function openTplModal() { renderTplList(); document.getElementById('tpl-modal').classList.remove('hidden'); }
+function renderTplList() {
+  var wrap = document.getElementById('tpl-list'), arr = getTemplates();
+  if (!arr.length) { wrap.innerHTML = '<div class="hint">保存済みテンプレートはありません</div>'; return; }
+  wrap.innerHTML = '';
+  arr.forEach(function (t, i) {
+    var div = document.createElement('div'); div.className = 'tpl-row';
+    div.innerHTML = '<button class="tpl-load">' + esc(t.name) + ' <small>' + t.items.length + '品</small></button><button class="link danger tpl-del">削除</button>';
+    div.querySelector('.tpl-load').addEventListener('click', function () { loadTemplate(t); document.getElementById('tpl-modal').classList.add('hidden'); });
+    div.querySelector('.tpl-del').addEventListener('click', function () { var a = getTemplates(); a.splice(i, 1); saveTemplates(a); renderTplList(); });
+    wrap.appendChild(div);
+  });
+}
+function onSaveTemplate() {
+  var items = [];
+  document.querySelectorAll('#rows .row').forEach(function (row) {
+    var item = row.querySelector('.r-item').value.trim(); if (!item) return;
+    items.push({ item: item, category: row.querySelector('.r-cat').value, qty: Number(row.querySelector('.r-qty').value) || 1, price: Number(row.querySelector('.r-price').value) || 0 });
+  });
+  if (!items.length) { toast('', '保存する明細がありません', true); return; }
+  var name = prompt('テンプレート名'); if (name == null) return; name = name.trim(); if (!name) return;
+  var arr = getTemplates();
+  arr.push({ name: name, store: document.getElementById('store').value, type: CURRENT_TYPE, items: items });
+  saveTemplates(arr); renderTplList(); toast('', 'テンプレートを保存しました', false);
+}
+function loadTemplate(t) {
+  var seg = document.querySelector('#type-seg .seg-btn[data-type="' + (t.type || '支出') + '"]'); if (seg) seg.click();
+  document.getElementById('store').value = t.store || '';
+  document.getElementById('rows').innerHTML = '';
+  t.items.forEach(function (it) { addRow(it); });
+  recalcTotal();
+  toast('', 'テンプレートを読み込みました', false);
+}
+
+// ====== 貯蓄目標(カテゴリ別) ======
+function renderSavingGoals(p) {
+  p = p || { goals: {}, totals: {} };
+  var goals = p.goals || {}, totals = p.totals || {};
+  var el = document.getElementById('goal-body');
+  var sav = CATEGORIES.filter(function (c) { return c.type === '貯蓄'; });
+  if (!sav.length) { el.innerHTML = '<div class="hint">貯蓄カテゴリを作成すると、目標を設定できます。</div>'; return; }
+  el.innerHTML = '';
+  sav.forEach(function (c) {
+    var g = goals[c.name] || { final: 0, monthly: 0 };
+    // 現在値: 手入力(g.current)があればそれを優先、無ければ貯蓄実績の累計
+    var total = (g.current != null && g.current > 0) ? g.current : (totals[c.name] || 0);
+    var finalGoal = g.final || 0, monthly = g.monthly || 0;
+    var done = finalGoal > 0 && total >= finalGoal;
+    var bar = finalGoal > 0 ? '<div class="goal-bar"><div class="goal-fill' + (done ? ' done' : '') + '" style="width:' + Math.min(100, Math.round(total / finalGoal * 100)) + '%"></div></div>' : '';
+    var meta, extra = '';
+    if (finalGoal > 0) {
+      meta = yen(total) + ' / ' + yen(finalGoal) + '（進捗 ' + Math.round(total / finalGoal * 100) + '%）' + (done ? ' 🎉達成！' : '');
+      if (!done) {
+        var remain = finalGoal - total;
+        extra = '残り ' + yen(remain);
+        if (monthly > 0) {
+          var months = Math.ceil(remain / monthly);
+          var d = new Date(); d.setMonth(d.getMonth() + months);
+          extra += '・毎月目標 ' + yen(monthly) + '<br>達成まで <b>あと' + months + 'か月</b>（' + d.getFullYear() + '年' + (d.getMonth() + 1) + '月頃）';
+        } else {
+          extra += '<br>毎月の目標を設定すると達成時期を予測します';
+        }
+      }
+    } else if (monthly > 0) {
+      meta = '累計 ' + yen(total) + '・毎月目標 ' + yen(monthly);
+    } else {
+      meta = '累計 ' + yen(total) + '・目標未設定';
+    }
+    var row = document.createElement('div'); row.className = 'goal-item';
+    row.innerHTML = '<div class="goal-head"><span class="goal-name">' + esc(c.name) + '</span><button class="link goal-edit">編集</button></div>' +
+      bar + '<div class="goal-meta">' + meta + '</div>' + (extra ? '<div class="goal-extra">' + extra + '</div>' : '') +
+      '<div class="goal-edit-form hidden">' +
+        '<div class="gf-row"><label>現在の貯蓄額</label><input class="gf-current" type="number" inputmode="numeric" value="' + (total || '') + '"></div>' +
+        '<div class="gf-row"><label>最終目標</label><input class="gf-final" type="number" inputmode="numeric" value="' + (finalGoal || '') + '"></div>' +
+        '<div class="gf-row"><label>毎月目標</label><input class="gf-monthly" type="number" inputmode="numeric" value="' + (monthly || '') + '"></div>' +
+        '<div class="gf-actions"><button class="btn-add gf-save">保存</button><button class="link gf-cancel">閉じる</button></div>' +
+      '</div>';
+    row.querySelector('.goal-edit').addEventListener('click', function () { row.querySelector('.goal-edit-form').classList.toggle('hidden'); });
+    row.querySelector('.gf-cancel').addEventListener('click', function () { row.querySelector('.goal-edit-form').classList.add('hidden'); });
+    row.querySelector('.gf-save').addEventListener('click', function () {
+      var cv = Number(row.querySelector('.gf-current').value) || 0;
+      var f = Number(row.querySelector('.gf-final').value) || 0;
+      var m = Number(row.querySelector('.gf-monthly').value) || 0;
+      serverCall('saveSavingGoal', [c.name, f, m, cv], function (p) {
+        if (ANALYTICS) ANALYTICS.savingProgress = p;
+        renderSavingGoals(p); toast('', '保存しました', false);
+      });
+    });
+    el.appendChild(row);
+  });
+}
+
+// ====== 固定費の自動計上ログ ======
+function renderRecurringLog(logs) {
+  var el = document.getElementById('recurring-log');
+  if (!logs || !logs.length) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="rl-title">自動計上ログ</div>' + logs.map(function (l) { return '<div class="rl-row">' + esc(l.at) + '　' + esc(l.info) + '</div>'; }).join('');
+}
+
+// 月別 貯蓄の棒グラフ
+function renderSavingTrend(trend) {
+  var max = 1; trend.forEach(function (t) { max = Math.max(max, t.saving); });
+  var el = document.getElementById('saving-trend');
+  el.innerHTML = trend.map(function (t) {
+    return '<div class="tcol" data-m="' + t.month + '"><div class="tbars">' +
+      '<div class="tbar saving" style="height:' + Math.round(t.saving / max * 100) + '%"></div>' +
+      '</div><div class="tmonth">' + t.month + '</div></div>';
+  }).join('');
+  el.querySelectorAll('.tcol').forEach(function (col) {
+    col.addEventListener('click', function () {
+      var t = trend[Number(col.getAttribute('data-m')) - 1];
+      el.querySelectorAll('.tcol').forEach(function (c) { c.classList.remove('sel'); });
+      col.classList.add('sel');
+      var d = document.getElementById('saving-trend-detail');
+      d.classList.remove('hidden');
+      d.innerHTML = '<b>' + t.month + '月</b>　貯蓄 <span class="s">' + yen(t.saving) + '</span>';
+    });
+  });
+}
+// 貯蓄カテゴリ別（年間）
+function renderSavingCategories(cats, year) {
+  var wrap = document.getElementById('saving-cat');
+  var list = (cats || []).filter(function (c) { return catTypeOf(c) === '貯蓄'; });
+  if (!list.length) { wrap.innerHTML = '<div class="empty"><div class="empty-ico">🐷</div><div>' + year + '年の貯蓄データがありません</div></div>'; return; }
+  wrap.innerHTML = '';
+  yearCatSection(wrap, '貯蓄', sortCatList(list));
+}
+
+// カテゴリ別（年間合計）+ タップで月別推移
+function renderYearCategories(cats, year) {
+  var wrap = document.getElementById('year-cat');
+  if (!cats || !cats.length) { wrap.innerHTML = '<div class="empty"><div class="empty-ico">📅</div><div>' + year + '年のデータがありません</div></div>'; return; }
+  cats = sortCatList(cats);
+  wrap.innerHTML = '';
+  ['支出', '収入'].forEach(function (tp) {
+    yearCatSection(wrap, tp, cats.filter(function (c) { return catTypeOf(c) === tp; }));
+  });
+}
+function yearCatSection(wrap, title, list) {
+  if (!list.length) return;
+  var head = document.createElement('div');
+  head.className = 'cat-sub ' + typeCssOf(title);
+  head.textContent = title;
+  wrap.appendChild(head);
+  list.forEach(function (c) {
+    var t = catTypeOf(c);
+    var amount = catAmtByType(c, t);
+    var typeCls = typeCssOf(t);
+    var row = document.createElement('div');
+    row.className = 'yc-item';
+    row.innerHTML =
+      '<div class="yc-head">' +
+        '<span class="cb-name">' + esc(c.name) + ' <span class="yc-caret">▾</span></span>' +
+        '<span class="cb-amt ' + typeCls + '">' + yen(amount) + '</span>' +
+      '</div>' +
+      '<div class="yc-trend hidden"></div>';
+    row.querySelector('.yc-head').addEventListener('click', function () {
+      var box = row.querySelector('.yc-trend');
+      var caret = row.querySelector('.yc-caret');
+      if (box.classList.contains('hidden')) {
+        box.innerHTML = catTrendHtml(c.monthly);
+        box.classList.remove('hidden'); caret.textContent = '▴';
+      } else {
+        box.classList.add('hidden'); caret.textContent = '▾';
+      }
+    });
+    wrap.appendChild(row);
+  });
+}
+function catTrendHtml(monthly) {
+  var max = 1;
+  monthly.forEach(function (m) { max = Math.max(max, m.income, m.expense, m.saving || 0); });
+  var bars = monthly.map(function (m) {
+    var ih = Math.round(m.income / max * 100), eh = Math.round(m.expense / max * 100), sh = Math.round((m.saving || 0) / max * 100);
+    return '<div class="ytcol"><div class="ytbars">' +
+      (m.income > 0 ? '<div class="tbar income" style="height:' + ih + '%"></div>' : '') +
+      (m.expense > 0 ? '<div class="tbar expense" style="height:' + eh + '%"></div>' : '') +
+      (m.saving > 0 ? '<div class="tbar saving" style="height:' + sh + '%"></div>' : '') +
+      '</div><div class="tmonth">' + m.month + '</div></div>';
+  }).join('');
+  return '<div class="trend">' + bars + '</div>';
+}
+function setKpi(idBase, cur, prev, expenseUp) {
+  document.getElementById(idBase).textContent = yen(cur);
+  var el = document.getElementById(idBase + '-d'), diff = cur - prev;
+  if (prev === 0 && cur === 0) { el.textContent = '増減なし'; el.className = 'kpi-diff flat'; return; }
+  var pct = prev !== 0 ? Math.round(Math.abs(diff) / Math.abs(prev) * 100) : null;
+  var arrow = diff > 0 ? '▲' : (diff < 0 ? '▼' : '―');
+  el.textContent = arrow + ' ' + yen(Math.abs(diff)) + (pct !== null ? ' (' + pct + '%)' : '');
+  var good = diff === 0 ? 'flat' : (expenseUp ? (diff > 0 ? 'bad' : 'good') : (diff > 0 ? 'good' : 'bad'));
+  el.className = 'kpi-diff ' + good;
+}
+
+// 機能9: 収支の折れ線(SVG)
+function renderTrendLine(trend) {
+  var W = 320, H = 130, pad = 24;
+  var vals = trend.map(function (t) { return t.balance; });
+  var max = Math.max.apply(null, vals.concat([0])), min = Math.min.apply(null, vals.concat([0]));
+  if (max === min) { max += 1; min -= 1; }
+  var x = function (i) { return pad + i * (W - pad * 2) / 11; };
+  var y = function (v) { return pad + (max - v) / (max - min) * (H - pad * 2); };
+  var pts = trend.map(function (t, i) { return x(i) + ',' + y(t.balance); }).join(' ');
+  var zeroY = y(0);
+  var dots = trend.map(function (t, i) {
+    return '<circle cx="' + x(i) + '" cy="' + y(t.balance) + '" r="2.5" fill="' + (t.balance >= 0 ? '#2e7d32' : '#d32f2f') + '"></circle>';
+  }).join('');
+  var labels = trend.map(function (t, i) { return '<text x="' + x(i) + '" y="' + (H - 4) + '" font-size="8" text-anchor="middle" fill="#999">' + t.month + '</text>'; }).join('');
+  var svg =
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" width="100%">' +
+      '<line x1="' + pad + '" y1="' + zeroY + '" x2="' + (W - pad) + '" y2="' + zeroY + '" stroke="#ccc" stroke-dasharray="3"></line>' +
+      '<polyline points="' + pts + '" fill="none" stroke="#2e7d32" stroke-width="2"></polyline>' +
+      dots + labels +
+    '</svg>';
+  document.getElementById('trend-line').innerHTML = svg;
+}
+
+function renderTrend(trend) {
+  var max = 1; trend.forEach(function (t) { max = Math.max(max, t.income, t.expense); });
+  var el = document.getElementById('trend');
+  el.innerHTML = trend.map(function (t) {
+    return '<div class="tcol" data-m="' + t.month + '"><div class="tbars">' +
+      '<div class="tbar income" style="height:' + Math.round(t.income / max * 100) + '%"></div>' +
+      '<div class="tbar expense" style="height:' + Math.round(t.expense / max * 100) + '%"></div>' +
+      '</div><div class="tmonth">' + t.month + '</div></div>';
+  }).join('');
+  el.querySelectorAll('.tcol').forEach(function (col) {
+    col.addEventListener('click', function () {
+      var t = trend[Number(col.getAttribute('data-m')) - 1];
+      el.querySelectorAll('.tcol').forEach(function (c) { c.classList.remove('sel'); });
+      col.classList.add('sel');
+      var d = document.getElementById('trend-detail');
+      d.classList.remove('hidden');
+      d.innerHTML = '<b>' + t.month + '月</b>　収入 <span class="b">' + yen(t.income) + '</span>　支出 <span class="r">' + yen(t.expense) + '</span>　収支 <span class="' + (t.balance >= 0 ? 'b' : 'r') + '">' + yen(t.balance) + '</span>';
+    });
+  });
+}
+
+// 機能9: 支出カテゴリのドーナツ(SVG)
+function renderDonut(categories) {
+  var data = categories.filter(function (c) { return c.expense > 0; })
+    .map(function (c) { return { name: c.name, value: c.expense }; });
+  var wrap = document.getElementById('cat-donut');
+  var total = data.reduce(function (s, d) { return s + d.value; }, 0);
+  if (!total) { wrap.innerHTML = '<div class="empty"><div class="empty-ico">📊</div><div>この月の支出データはありません</div></div>'; return; }
+  var r = 60, cx = 80, cy = 80, circ = 2 * Math.PI * r, offset = 0, segs = '', legend = '';
+  data.forEach(function (d, i) {
+    var frac = d.value / total, color = DONUT_COLORS[i % DONUT_COLORS.length];
+    segs += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="none" stroke="' + color +
+      '" stroke-width="28" stroke-dasharray="' + (frac * circ) + ' ' + circ +
+      '" stroke-dashoffset="' + (-offset) + '" transform="rotate(-90 ' + cx + ' ' + cy + ')"></circle>';
+    offset += frac * circ;
+    legend += '<div class="dl" data-i="' + i + '"><span class="dot" style="background:' + color + '"></span>' +
+      esc(d.name) + ' <b>' + Math.round(frac * 100) + '%</b></div>';
+  });
+  wrap.innerHTML =
+    '<svg viewBox="0 0 160 160" width="150" height="150">' + segs +
+    '<text x="80" y="78" text-anchor="middle" font-size="11" fill="#777">支出計</text>' +
+    '<text x="80" y="94" text-anchor="middle" font-size="13" font-weight="700" fill="#333">' + yen(total) + '</text></svg>' +
+    '<div class="donut-legend">' + legend + '</div>';
+  wrap.querySelectorAll('.dl').forEach(function (dl) {
+    dl.addEventListener('click', function () {
+      var d = data[Number(dl.getAttribute('data-i'))];
+      wrap.querySelectorAll('.dl').forEach(function (x) { x.classList.remove('sel'); });
+      dl.classList.add('sel');
+      var det = document.getElementById('donut-detail');
+      det.classList.remove('hidden');
+      det.innerHTML = '<b>' + esc(d.name) + '</b>　<span class="r">' + yen(d.value) + '</span>　全体の ' + Math.round(d.value / total * 100) + '%';
+    });
+  });
+}
+
+// カテゴリの種別を判定(設定優先、なければ金額から推定)
+function catTypeOf(c) {
+  for (var i = 0; i < CATEGORIES.length; i++) if (CATEGORIES[i].name === c.name) return CATEGORIES[i].type;
+  var inc = Number(c.income) || 0, exp = Number(c.expense) || 0, sav = Number(c.saving) || 0;
+  if (sav > inc && sav > exp) return '貯蓄';
+  return inc > exp ? '収入' : '支出';
+}
+function catAmtByType(c, t) { return t === '収入' ? (c.income || 0) : (t === '貯蓄' ? (c.saving || 0) : (c.expense || 0)); }
+function catPrevByType(c, t) { return t === '収入' ? (c.prevIncome || 0) : (t === '貯蓄' ? (c.prevSaving || 0) : (c.prevExpense || 0)); }
+function typeCssOf(t) { return t === '収入' ? 'income' : (t === '貯蓄' ? 'saving' : 'expense'); }
+
+function renderCategories(cats) {
+  var wrap = document.getElementById('cat-breakdown');
+  if (!cats.length) { wrap.innerHTML = '<div class="hint">データがありません</div>'; return; }
+  cats = sortCatList(cats);
+  var html = ['支出', '収入'].map(function (tp) {
+    return catSectionHtml(tp, cats.filter(function (c) { return catTypeOf(c) === tp; }));
+  }).join('');
+  wrap.innerHTML = html || '<div class="hint">データがありません</div>';
+}
+// カテゴリ行をタップ → その月の内訳明細を展開
+function toggleCatEntries(row) {
+  var next = row.nextElementSibling;
+  if (next && next.classList.contains('cb-detail')) { next.remove(); row.classList.remove('open'); return; }
+  // 他の開いている内訳を閉じる
+  document.querySelectorAll('#cat-breakdown .cb-detail').forEach(function (d) { d.remove(); });
+  document.querySelectorAll('#cat-breakdown .cb-row.open').forEach(function (r) { r.classList.remove('open'); });
+  if (!ANALYTICS) return;
+  var cat = row.getAttribute('data-cat');
+  row.classList.add('open');
+  var det = document.createElement('div');
+  det.className = 'cb-detail';
+  det.innerHTML = '<div class="hint">読み込み中…</div>';
+  row.parentNode.insertBefore(det, row.nextSibling);
+  google.script.run.withSuccessHandler(function (list) {
+    if (!list.length) { det.innerHTML = '<div class="hint">明細がありません</div>'; return; }
+    det.innerHTML = list.map(function (e) {
+      return '<div class="cd-row"><span class="cd-item">' + esc(e.item) + (e.store ? ' <small>' + esc(e.store) + '</small>' : '') + '</span>' +
+        '<span class="cd-amt">' + yen(e.subtotal) + '</span></div>' +
+        (e.itemNote ? '<div class="cd-note">📝 ' + esc(e.itemNote) + '</div>' : '') +
+        (e.note ? '<div class="cd-note">🧾 ' + esc(e.note) + '</div>' : '');
+    }).join('');
+  }).withFailureHandler(function () { det.innerHTML = '<div class="hint">取得に失敗しました</div>'; })
+    .getCategoryEntries(ANALYTICS.year, ANALYTICS.month, cat);
+}
+function catSectionHtml(title, list) {
+  if (!list.length) return '';
+  var rows = list.map(function (c) {
+    var t = catTypeOf(c);
+    var amount = catAmtByType(c, t);
+    var d = amount - catPrevByType(c, t);
+    var dCls = d === 0 ? 'flat' : (d > 0 ? 'good' : 'bad');
+    var dTxt = (d > 0 ? '▲' : (d < 0 ? '▼' : '―')) + ' ' + yen(Math.abs(d));
+    return '<div class="cb-row" data-cat="' + esc(c.name) + '"><span class="cb-name">' + esc(c.name) + ' <span class="cb-caret">›</span></span>' +
+      '<span class="cb-amt ' + typeCssOf(t) + '">' + yen(amount) + '</span>' +
+      '<span class="cb-diff ' + dCls + '">前月比 ' + dTxt + '</span></div>';
+  }).join('');
+  return '<div class="cat-sub ' + typeCssOf(title) + '">' + title + '</div>' + rows;
+}
+
+// ====== カテゴリ管理 ======
+// 種別ごとの折りたたみ状態(localStorageで保持→リロード後も維持)
+var CAT_COLLAPSED = (function () { try { return JSON.parse(localStorage.getItem('kakeibo_cat_collapsed') || '{}'); } catch (e) { return {}; } })();
+function saveCatCollapsed() { try { localStorage.setItem('kakeibo_cat_collapsed', JSON.stringify(CAT_COLLAPSED)); } catch (e) {} }
+function renderCategoryList() {
+  var ul = document.getElementById('category-list'); ul.innerHTML = '';
+  renderCatSection(ul, '支出', '支出カテゴリ');
+  renderCatSection(ul, '収入', '収入カテゴリ');
+  renderCatSection(ul, '貯蓄', '貯蓄カテゴリ');
+}
+function renderCatSection(ul, type, title) {
+  var list = CATEGORIES.filter(function (c) { return c.type === type; });
+  var collapsed = !!CAT_COLLAPSED[type];
+  var head = document.createElement('li');
+  head.className = 'cat-section toggle' + (collapsed ? ' collapsed' : '');
+  head.innerHTML = '<span class="cs-caret">▾</span>' + title + '（' + list.length + '）';
+  var body = document.createElement('li');
+  body.className = 'cat-section-body' + (collapsed ? ' hidden' : '');
+  head.addEventListener('click', function () {
+    CAT_COLLAPSED[type] = !CAT_COLLAPSED[type];
+    saveCatCollapsed();
+    body.classList.toggle('hidden'); head.classList.toggle('collapsed');
+  });
+  ul.appendChild(head); ul.appendChild(body);
+  if (!list.length) {
+    var empty = document.createElement('div'); empty.className = 'cat-empty'; empty.textContent = '未登録';
+    body.appendChild(empty); return;
+  }
+  list.forEach(function (c, idx) {
+    // 位置プルダウン(1..N)
+    var posOpts = '';
+    for (var p = 1; p <= list.length; p++) posOpts += '<option value="' + p + '"' + (p === idx + 1 ? ' selected' : '') + '>' + p + '</option>';
+    var li = document.createElement('div');
+    li.className = 'cat-li';
+    li.innerHTML =
+      '<div class="cat-row">' +
+        '<span class="cat-name">' + esc(c.name) + '</span>' +
+        '<span class="cat-actions">' +
+          '<select class="cat-pos" title="位置を変更">' + posOpts + '</select>' +
+          '<button class="link" data-act="edit">編集</button>' +
+          '<button class="link danger" data-act="del">削除</button>' +
+        '</span>' +
+      '</div>' +
+      '<div class="cat-edit hidden">' +
+        '<input class="ce-name" type="text" value="' + esc(c.name) + '">' +
+        '<select class="ce-type">' + typeOptions(c.type) + '</select>' +
+        '<button class="btn-add ce-save">保存</button>' +
+        '<button class="link ce-cancel">閉じる</button>' +
+      '</div>';
+    li.querySelector('.cat-pos').addEventListener('change', function () { onReorderCategory(type, idx, Number(this.value) - 1); });
+    li.querySelector('[data-act="edit"]').addEventListener('click', function () { li.querySelector('.cat-edit').classList.toggle('hidden'); });
+    li.querySelector('.ce-cancel').addEventListener('click', function () { li.querySelector('.cat-edit').classList.add('hidden'); });
+    li.querySelector('.ce-save').addEventListener('click', function () {
+      var newName = li.querySelector('.ce-name').value.trim();
+      var newType = li.querySelector('.ce-type').value;
+      if (!newName) { toast('', 'カテゴリ名を入力してください', true); return; }
+      serverCall('updateCategory', [c.name, newName, newType], function (l) { CATEGORIES = l; afterCategoryChange(); toast('', '変更しました', false); });
+    });
+    li.querySelector('[data-act="del"]').addEventListener('click', function () { onDeleteCategory(c.name); });
+    body.appendChild(li);
+  });
+}
+// 指定タイプ内で oldIdx の項目を newIdx へ移動し、全体の並び順をサーバーへ保存
+function onReorderCategory(type, oldIdx, newIdx) {
+  var byType = { '支出': [], '収入': [], '貯蓄': [] };
+  CATEGORIES.forEach(function (c) { (byType[c.type] || byType['支出']).push(c); });
+  var group = byType[type] || byType['支出'];
+  var moved = group.splice(oldIdx, 1)[0];
+  group.splice(newIdx, 0, moved);
+  // 支出→収入→貯蓄の順で全体を再構成(全種別を含める)
+  var names = byType['支出'].concat(byType['収入'], byType['貯蓄']).map(function (c) { return c.name; });
+  serverCall('setCategoryOrder', [names], function (l) { CATEGORIES = l; afterCategoryChange(); });
+}
+function onAddCategory() {
+  var input = document.getElementById('new-category'), name = input.value.trim(), type = document.getElementById('new-category-type').value;
+  if (!name) return;
+  serverCall('addCategory', [name, type], function (list) { CATEGORIES = list; afterCategoryChange(); input.value = ''; toast('manage-msg', '追加しました', false); });
+}
+function onDeleteCategory(name) {
+  if (!confirm('「' + name + '」を削除しますか？')) return;
+  serverCall('deleteCategory', [name], function (list) { CATEGORIES = list; afterCategoryChange(); toast('', '削除しました', false); });
+}
+function afterCategoryChange() {
+  renderCategoryList(); renderRecurringForm();
+  document.querySelectorAll('#rows .row .r-cat').forEach(function (sel) { var cur = sel.value; sel.innerHTML = categoryOptions(cur); });
+}
+
+// ====== 固定費 (機能11) ======
+function loadRecurring() {
+  serverCall('getRecurring', [], renderRecurring);
+  google.script.run.withSuccessHandler(renderRecurringLog).getRecurringLog();
+}
+function renderRecurringForm() {
+  document.getElementById('rec-category').innerHTML = catOptionsAll('');
+}
+// 種別ごとにグループ分けしたカテゴリ選択肢
+function catOptionsAll(selected) {
+  function grp(type) {
+    var items = CATEGORIES.filter(function (c) { return c.type === type; });
+    if (!items.length) return '';
+    return '<optgroup label="' + type + '">' + items.map(function (c) {
+      return '<option value="' + esc(c.name) + '"' + (c.name === selected ? ' selected' : '') + '>' + esc(c.name) + '</option>';
+    }).join('') + '</optgroup>';
+  }
+  return '<option value="">カテゴリ</option>' + grp('支出') + grp('収入');
+}
+function renderRecurring(list) {
+  var wrap = document.getElementById('recurring-list');
+  if (!list || !list.length) { wrap.innerHTML = '<div class="empty"><div class="empty-ico">🔁</div><div>固定費は未登録です</div></div>'; return; }
+  wrap.innerHTML = '';
+  list.forEach(function (r) {
+    var div = document.createElement('div');
+    div.className = 'rec-item ' + (r.type === '収入' ? 'in' : 'ex');
+    div.innerHTML =
+      '<div class="ri-view">' +
+        '<span class="ri-name">' + esc(r.name) + (r.posted ? '<span class="rec-posted">✓今月計上済</span>' : '<span class="rec-unposted">未計上</span>') + '<small>毎月' + r.day + '日・' + esc(r.category || '-') + (r.store ? '・' + esc(r.store) : '') + '<br>次回 ' + nextRecurringDate(r.day) + '</small></span>' +
+        '<span class="ri-amt">' + (r.type === '収入' ? '+' : '-') + yen(r.price * (r.qty || 1)) + '</span>' +
+        '<button class="link ri-edit">編集</button>' +
+      '</div>' +
+      '<div class="ri-edit-form hidden">' +
+        '<input class="re-name" type="text" placeholder="名称" value="' + esc(r.name) + '">' +
+        '<input class="re-store" type="text" placeholder="店名/支払先(任意)" value="' + esc(r.store || '') + '">' +
+        '<select class="re-cat">' + catOptionsAll(r.category) + '</select>' +
+        '<div class="re-row">' +
+          '<input class="re-price" type="number" inputmode="numeric" placeholder="金額" value="' + r.price + '">' +
+          '<input class="re-day" type="number" inputmode="numeric" min="1" max="31" placeholder="日" value="' + r.day + '">' +
+          '<select class="re-type">' + typeOptions(r.type) + '</select>' +
+        '</div>' +
+        '<div class="re-actions"><button class="btn-add re-save">保存</button>' +
+        '<button class="link danger re-del">削除</button>' +
+        '<button class="link re-cancel">閉じる</button></div>' +
+      '</div>';
+    div.querySelector('.ri-edit').addEventListener('click', function () { div.querySelector('.ri-edit-form').classList.toggle('hidden'); });
+    div.querySelector('.re-cancel').addEventListener('click', function () { div.querySelector('.ri-edit-form').classList.add('hidden'); });
+    div.querySelector('.re-save').addEventListener('click', function () {
+      var o = {
+        name: div.querySelector('.re-name').value.trim(), store: div.querySelector('.re-store').value.trim(), qty: 1,
+        category: div.querySelector('.re-cat').value,
+        price: Number(div.querySelector('.re-price').value) || 0,
+        day: Number(div.querySelector('.re-day').value) || 1,
+        type: div.querySelector('.re-type').value
+      };
+      if (!o.name) { toast('', '名称を入力してください', true); return; }
+      serverCall('updateRecurring', [r.sheetRow, o], function (l) { renderRecurring(l); toast('', '更新しました', false); });
+    });
+    div.querySelector('.re-del').addEventListener('click', function () {
+      if (!confirm('「' + r.name + '」を固定費から削除しますか？')) return;
+      serverCall('deleteRecurring', [r.sheetRow], function (l) { renderRecurring(l); toast('', '削除しました', false); });
+    });
+    wrap.appendChild(div);
+  });
+}
+function onAddRecurring() {
+  var o = {
+    name: document.getElementById('rec-name').value.trim(),
+    category: document.getElementById('rec-category').value,
+    price: Number(document.getElementById('rec-price').value) || 0,
+    day: Number(document.getElementById('rec-day').value) || 1,
+    type: document.getElementById('rec-type').value, qty: 1,
+    store: document.getElementById('rec-store').value.trim()
+  };
+  if (!o.name) { toast('', '名称を入力してください', true); return; }
+  serverCall('addRecurring', [o], function (list) {
+    renderRecurring(list);
+    document.getElementById('rec-name').value = ''; document.getElementById('rec-price').value = '';
+    document.getElementById('rec-store').value = '';
+    toast('', '固定費を追加しました', false);
+    if (confirm('「' + o.name + '」の今月分を今すぐ支出/収入に計上しますか？')) applyRecurringNow();
+  });
+}
+function onApplyRecurring() {
+  if (!confirm('今月分の固定費を計上します（重複は自動でスキップ）。よろしいですか？')) return;
+  applyRecurringNow();
+}
+function applyRecurringNow() {
+  serverCall('applyRecurringNow', [], function (n) {
+    toast('', n > 0 ? (n + '件を計上しました') : '計上対象はありませんでした（既に計上済み）', false);
+    refreshMiniSummary();
+  });
+}
+function onToggleTrigger() {
+  if (TRIGGER_ON) {
+    serverCall('removeMonthlyTrigger', [], function (msg) { TRIGGER_ON = false; updateTriggerButton(); toast('recurring-msg', msg, false); });
+  } else {
+    serverCall('setupMonthlyTrigger', [], function (msg) { TRIGGER_ON = true; updateTriggerButton(); toast('recurring-msg', msg, false); });
+  }
+}
+function updateTriggerButton() {
+  document.getElementById('toggle-trigger').textContent = '毎月自動計上：' + (TRIGGER_ON ? 'ON（タップでOFF）' : 'OFF（タップでON）');
+}
+
+// ====== エクスポート / バックアップ ======
+function onExportCsv() {
+  serverCall('exportDbAsCsv', [], function (csv) {
+    if (!csv) { toast('manage-msg', 'データがありません', true); return; }
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'kakeibo_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('manage-msg', 'CSVをダウンロードしました', false);
+  });
+}
+function onEmailCsv() {
+  if (!confirm('家計簿のCSVを自分のメールアドレスに送信しますか？')) return;
+  serverCall('emailCsv', [], function (email) { toast('', email + ' に送信しました', false); });
+}
+function onBackup() {
+  if (!confirm('現在のDBをバックアップシートにコピーしますか？')) return;
+  serverCall('backupDb', [], function (name) { toast('manage-msg', 'バックアップ作成: ' + name, false); });
+}
+
+// ====== クレジット/引き落とし管理 ======
+var DEBIT_YM = null;
+function switchMode(mode) {
+  var app = document.querySelector('.app'); var debit = mode === 'debit';
+  app.classList.toggle('debit-mode', debit);
+  document.getElementById('app-title').textContent = debit ? '引き落とし管理' : '家計簿';
+  document.getElementById('mode-switch').textContent = debit ? '📒 家計簿へ' : '💳 引き落とし';
+  if (debit) loadDebit();
+  window.scrollTo({ top: 0 });
+}
+function loadDebit() {
+  if (!DEBIT_YM) { var n = new Date(); DEBIT_YM = n.getFullYear() + '-' + ('0' + (n.getMonth() + 1)).slice(-2); }
+  serverCall('getDebitMonth', [DEBIT_YM], renderDebit);
+}
+function shiftDebitMonth(delta) {
+  var p = DEBIT_YM.split('-'); var d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+  DEBIT_YM = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2);
+  loadDebit();
+}
+var DEBIT_DATA = null;
+function getPayday() { var v = 25; try { v = Number(localStorage.getItem('kakeibo_payday')) || 25; } catch (e) {} return Math.min(31, Math.max(1, v)); }
+function renderDebit(data) {
+  DEBIT_DATA = data;
+  var p = DEBIT_YM.split('-');
+  document.getElementById('dm-label').textContent = Number(p[0]) + '年' + Number(p[1]) + '月';
+  document.getElementById('dm-total').textContent = yen(data.total);
+  document.getElementById('dm-count').textContent = data.items.length + '件';
+  renderDebitList();
+}
+function debitItemEl(it) {
+  var div = document.createElement('div'); div.className = 'debit-item';
+  var amountHtml = it.type === 'variable'
+    ? '<span class="di-amt-wrap"><span class="di-yen">¥</span><input class="di-amt-input" type="number" inputmode="numeric" placeholder="0" value="' + (it.amount || '') + '"></span>'
+    : '<span class="di-amt">' + yen(it.amount) + '</span>';
+  div.innerHTML =
+    '<div class="di-view">' +
+      '<span class="di-day">' + it.day + '日</span>' +
+      '<span class="di-name">' + esc(it.name) + '<small>' + (it.type === 'variable' ? '毎月入力' : '固定') + '</small></span>' +
+      amountHtml +
+      '<button class="link di-edit">編集</button>' +
+    '</div>' +
+    '<div class="di-edit-form hidden">' +
+      '<input class="de-name" type="text" value="' + esc(it.name) + '">' +
+      '<div class="df-row"><input class="de-day" type="number" inputmode="numeric" min="1" max="31" value="' + it.day + '">' +
+      '<select class="de-type"><option value="fixed"' + (it.type === 'fixed' ? ' selected' : '') + '>固定金額</option><option value="variable"' + (it.type === 'variable' ? ' selected' : '') + '>毎月入力</option></select></div>' +
+      '<input class="de-amount" type="number" inputmode="numeric" placeholder="固定金額" value="' + (it.baseAmount || '') + '">' +
+      '<div class="de-actions"><button class="btn-add de-save">保存</button><button class="link danger de-del">削除</button><button class="link de-cancel">閉じる</button></div>' +
+    '</div>';
+  if (it.type === 'variable') {
+    div.querySelector('.di-amt-input').addEventListener('change', function () {
+      serverCall('setDebitAmount', [it.id, DEBIT_YM, Number(this.value) || 0], renderDebit);
+    });
+  }
+  div.querySelector('.di-edit').addEventListener('click', function () { div.querySelector('.di-edit-form').classList.toggle('hidden'); });
+  div.querySelector('.de-cancel').addEventListener('click', function () { div.querySelector('.di-edit-form').classList.add('hidden'); });
+  div.querySelector('.de-save').addEventListener('click', function () {
+    var o = { name: div.querySelector('.de-name').value.trim(), day: div.querySelector('.de-day').value, type: div.querySelector('.de-type').value, amount: div.querySelector('.de-amount').value };
+    if (!o.name) { toast('', '名称を入力してください', true); return; }
+    serverCall('updateDebit', [it.id, o], function () { loadDebit(); toast('', '更新しました', false); });
+  });
+  div.querySelector('.de-del').addEventListener('click', function () {
+    if (!confirm('「' + it.name + '」を削除しますか？')) return;
+    serverCall('deleteDebit', [it.id], function () { loadDebit(); toast('', '削除しました', false); });
+  });
+  return div;
+}
+// 給料日で「給料日まで」「給料日以降」に分けて表示
+function renderDebitList() {
+  var data = DEBIT_DATA; if (!data) return;
+  var payday = getPayday();
+  var wrap = document.getElementById('debit-list');
+  if (!data.items.length) { wrap.innerHTML = '<div class="empty"><div class="empty-ico">💳</div><div>項目がありません。下から追加してください。</div></div>'; document.getElementById('dp-after-total').textContent = yen(0); return; }
+  var before = data.items.filter(function (it) { return it.day <= payday; });
+  var after = data.items.filter(function (it) { return it.day > payday; });
+  var afterTotal = after.reduce(function (s, it) { return s + it.amount; }, 0);
+  var beforeTotal = before.reduce(function (s, it) { return s + it.amount; }, 0);
+  document.getElementById('dp-after-total').textContent = yen(afterTotal);
+  wrap.innerHTML = '';
+  function section(title, list, subtotal) {
+    if (!list.length) return;
+    var h = document.createElement('div'); h.className = 'debit-sub';
+    h.innerHTML = '<span>' + title + '</span><span class="ds-sub">' + yen(subtotal) + '</span>';
+    wrap.appendChild(h);
+    list.forEach(function (it) { wrap.appendChild(debitItemEl(it)); });
+  }
+  section('給料日（' + payday + '日）まで', before, beforeTotal);
+  section('給料日（' + payday + '日）以降', after, afterTotal);
+}
+function onExportDebits() {
+  serverCall('exportDebitsCsv', [], function (csv) {
+    var blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = 'debits_' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    toast('', 'CSVを保存しました', false);
+  });
+}
+function onAddDebit() {
+  var o = { name: document.getElementById('d-name').value.trim(), day: document.getElementById('d-day').value, type: document.getElementById('d-type').value, amount: document.getElementById('d-amount').value };
+  if (!o.name) { toast('', '名称を入力してください', true); return; }
+  serverCall('addDebit', [o], function () {
+    document.getElementById('d-name').value = ''; document.getElementById('d-day').value = ''; document.getElementById('d-amount').value = '';
+    loadDebit(); toast('', '追加しました', false);
+  });
+}
+
+// ====== ユーティリティ ======
+function showLoading(on) { document.getElementById('loading').classList.toggle('hidden', !on); }
+var AMOUNT_UNIT = 'yen';
+function yen(n) {
+  n = Math.round(Number(n) || 0);
+  if (AMOUNT_UNIT === 'man') {
+    var a = Math.abs(n);
+    if (a >= 10000) return '¥' + (n / 10000).toFixed(1).replace(/\.0$/, '') + '万';
+  }
+  return '¥' + n.toLocaleString();
+}
+function loadUnit() { try { AMOUNT_UNIT = localStorage.getItem('kakeibo_unit') || 'yen'; } catch (e) { AMOUNT_UNIT = 'yen'; } }
+// 表示モード(自動/ライト/ダーク)
+function applyThemeMode(mode) {
+  try { localStorage.setItem('kakeibo_thememode', mode); } catch (e) {}
+  var osDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  var dark = mode === 'dark' || (mode === 'auto' && osDark);
+  document.body.classList.toggle('dark', dark);
+  document.querySelectorAll('#mode-toggle .seg-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-mode') === mode); });
+}
+function loadThemeMode() {
+  var mode = 'auto'; try { mode = localStorage.getItem('kakeibo_thememode') || 'auto'; } catch (e) {}
+  applyThemeMode(mode);
+  if (window.matchMedia) { try { window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { var m = 'auto'; try { m = localStorage.getItem('kakeibo_thememode') || 'auto'; } catch (e) {} if (m === 'auto') applyThemeMode('auto'); }); } catch (e) {} }
+}
+function setUnit(u) {
+  AMOUNT_UNIT = u;
+  try { localStorage.setItem('kakeibo_unit', u); } catch (e) {}
+  document.querySelectorAll('#unit-toggle .seg-btn').forEach(function (b) { b.classList.toggle('active', b.getAttribute('data-unit') === u); });
+  refreshMiniSummary();
+  if (ANALYTICS) renderAnalytics(ANALYTICS);
+  if (!document.getElementById('tab-history').classList.contains('hidden')) loadHistory();
+}
+var SNACK_TIMER = null;
+function toast(_id, text, isError) {
+  var bar = document.getElementById('snackbar');
+  document.getElementById('snack-icon').textContent = isError ? '⚠' : '✓';
+  document.getElementById('snack-text').textContent = text;
+  bar.className = 'snackbar ' + (isError ? 'err' : 'ok');
+  if (SNACK_TIMER) clearTimeout(SNACK_TIMER);
+  SNACK_TIMER = setTimeout(function () { bar.classList.add('hidden'); }, 3500);
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+// ====== 電卓 ======
+var CALC_TARGET = null, CALC_EXPR = '';
+function openCalc(input) {
+  CALC_TARGET = input;
+  var v = (input && input.value != null) ? String(input.value) : '';
+  CALC_EXPR = /^\d*\.?\d+$/.test(v) ? v : '';
+  updateCalcDisplay();
+  document.getElementById('calc-modal').classList.remove('hidden');
+}
+function closeCalc() { document.getElementById('calc-modal').classList.add('hidden'); CALC_TARGET = null; }
+function updateCalcDisplay() { document.getElementById('calc-display').textContent = CALC_EXPR || '0'; }
+function calcKey(k) {
+  if (k === 'cancel') { closeCalc(); return; }
+  if (k === 'ok') { applyCalc(); return; }
+  if (k === 'C') CALC_EXPR = '';
+  else if (k === 'back') CALC_EXPR = CALC_EXPR.slice(0, -1);
+  else if (k === '=') { var v = calcEval(CALC_EXPR); if (v != null && isFinite(v)) CALC_EXPR = String(round2(v)); }
+  else CALC_EXPR += k;
+  updateCalcDisplay();
+}
+function applyCalc() {
+  var v = calcEval(CALC_EXPR);
+  if (v == null || !isFinite(v)) { closeCalc(); return; }
+  if (CALC_TARGET) {
+    CALC_TARGET.value = round2(v);
+    CALC_TARGET.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+  closeCalc();
+}
+function round2(n) { return Math.round(n * 100) / 100; }
+// + - * / と小数に対応(*と/を優先)。括弧なし。
+function calcEval(s) {
+  s = String(s || '').replace(/×/g, '*').replace(/÷/g, '/').replace(/[^0-9+\-*/.]/g, '');
+  if (!s) return null;
+  var tokens = s.match(/(\d*\.?\d+|[+\-*/])/g);
+  if (!tokens) return null;
+  var first = parseFloat(tokens[0]);
+  if (isNaN(first)) return null;
+  var stack = [first];
+  for (var i = 1; i < tokens.length; i += 2) {
+    var op = tokens[i], num = parseFloat(tokens[i + 1]);
+    if (isNaN(num)) return null;
+    if (op === '*') stack[stack.length - 1] *= num;
+    else if (op === '/') stack[stack.length - 1] /= num;
+    else if (op === '+') stack.push(num);
+    else if (op === '-') stack.push(-num);
+  }
+  return stack.reduce(function (a, b) { return a + b; }, 0);
+}
+
+// ====== カスタム入力候補(店名・商品名) ======
+var SUG_BOX = null;
+function sugBox() { if (!SUG_BOX) { SUG_BOX = document.createElement('div'); SUG_BOX.className = 'suggest-box hidden'; document.body.appendChild(SUG_BOX); } return SUG_BOX; }
+function hideSug() { if (SUG_BOX) SUG_BOX.classList.add('hidden'); }
+function attachSuggest(input, getList, onPick) {
+  if (!input) return;
+  input.setAttribute('autocomplete', 'off');
+  function render() {
+    var box = sugBox();
+    var q = input.value.trim().toLowerCase();
+    if (!q) { hideSug(); return; }
+    var list = getList() || [], matches = [];
+    for (var i = 0; i < list.length; i++) {
+      var v = String(list[i]); if (!v) continue;
+      var lv = v.toLowerCase();
+      if (lv.indexOf(q) >= 0 && lv !== q) matches.push(v);
+    }
+    matches.sort(function (a, b) { return (a.toLowerCase().indexOf(q) === 0 ? 0 : 1) - (b.toLowerCase().indexOf(q) === 0 ? 0 : 1); });
+    matches = matches.slice(0, 8);
+    if (!matches.length) { hideSug(); return; }
+    var r = input.getBoundingClientRect();
+    box.style.left = Math.round(r.left) + 'px';
+    box.style.top = Math.round(r.bottom + 2) + 'px';
+    box.style.width = Math.round(r.width) + 'px';
+    box.innerHTML = matches.map(function (m) { return '<div class="sg-item">' + esc(m) + '</div>'; }).join('');
+    Array.prototype.forEach.call(box.querySelectorAll('.sg-item'), function (el, idx) {
+      var pick = function (ev) { ev.preventDefault(); input.value = matches[idx]; hideSug(); if (onPick) onPick(matches[idx]); };
+      el.addEventListener('mousedown', pick);
+      el.addEventListener('touchstart', pick, { passive: false });
+    });
+    box.classList.remove('hidden');
+  }
+  input.addEventListener('input', render);
+  input.addEventListener('focus', render);
+  input.addEventListener('blur', function () { setTimeout(hideSug, 150); });
+}
+</script>
+</body>
+</html>
