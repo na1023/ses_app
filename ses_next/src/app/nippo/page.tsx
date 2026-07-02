@@ -1,6 +1,7 @@
-import { listRecentDaily, listCompanies } from "@/lib/actions";
+import { listRecentDaily, listCompanies, getCurrentUser } from "@/lib/actions";
 import { ATT_COLOR, LATE_EARLY_TYPES } from "@/lib/constants";
 import NippoForm from "./NippoForm";
+import AccountBar from "@/components/AccountBar";
 
 export const dynamic = "force-dynamic";
 
@@ -8,6 +9,7 @@ export default async function NippoPage() {
   let reports: Awaited<ReturnType<typeof listRecentDaily>> = [];
   let companies: string[] = [];
   let loadError = "";
+  const user = await getCurrentUser();
   try {
     [reports, companies] = await Promise.all([
       listRecentDaily(30),
@@ -19,6 +21,7 @@ export default async function NippoPage() {
 
   return (
     <div className="px-4 pt-5">
+      {user ? <AccountBar email={user.email} /> : null}
       <header className="mb-4">
         <h1 className="text-xl font-bold">日報</h1>
         <p className="text-xs" style={{ color: "var(--subtle)" }}>

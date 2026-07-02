@@ -12,6 +12,7 @@ const ITEMS = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  if (pathname.startsWith("/login")) return null;
   return (
     <nav
       className="fixed bottom-0 left-1/2 z-50 w-full max-w-xl -translate-x-1/2 border-t"
