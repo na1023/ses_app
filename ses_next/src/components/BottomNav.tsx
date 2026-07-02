@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ITEMS = [
-  { href: "/nippo", label: "日報", icon: "📝" },
+  { href: "/", label: "日報", icon: "📝" },
   { href: "/projects", label: "案件", icon: "📁" },
   { href: "/salary", label: "給与", icon: "💰" },
   { href: "/more", label: "その他", icon: "⋯" },

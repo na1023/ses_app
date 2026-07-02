@@ -1,36 +1,43 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SES業務管理 — Next.js PWA 版
 
-## Getting Started
+スマホ・PC 両対応の業務管理アプリ（Streamlit 版のデータ＝Supabase をそのまま利用）。
+ホーム画面に「インストール」してネイティブアプリのように使えます（PWA）。
 
-First, run the development server:
+## セットアップ
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cd ses_next
+npm install
+cp .env.local.example .env.local   # 値を編集
+npm run dev                        # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` には既存 Streamlit と同じ Supabase 情報を設定します：
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_KEY=（service_role キー）
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> キーはサーバー側（Server Actions）でのみ使用し、ブラウザには露出しません。
 
-## Learn More
+## 実装状況（段階リリース）
 
-To learn more about Next.js, take a look at the following resources:
+- [x] **Phase 1**：スマホ最優先の日報入力・一覧（ネイティブ日付/時刻ピッカー、勤怠区分チップ、
+      実働時間の自動計算、有給/欠勤は備考のみで登録）
+- [ ] Phase 2：案件・面談・ToDo・カレンダー
+- [ ] Phase 3：給与・有給・残業・レポート（グラフ）
+- [ ] Phase 4：職務経歴生成・データ診断
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## デプロイ（推奨: Vercel）
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. GitHub リポジトリを Vercel に連携（Root Directory を `ses_next` に設定）
+2. Environment Variables に `SUPABASE_URL` / `SUPABASE_KEY` を登録
+3. デプロイ後、スマホでURLを開き「ホーム画面に追加」でアプリ化
 
-## Deploy on Vercel
+## 技術構成
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Next.js 14（App Router / Server Actions）
+- Supabase（既存テーブルを流用）
+- Tailwind CSS（ダークテーマ・モバイルファースト）
+- PWA（manifest / standalone 表示）

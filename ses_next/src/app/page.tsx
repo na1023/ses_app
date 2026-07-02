@@ -1,5 +1,2 @@
-import { redirect } from "next/navigation";
-
-export default function Home() {
-  redirect("/nippo");
-}
+export { default } from "./nippo/page";
+export const dynamic = "force-dynamic";
