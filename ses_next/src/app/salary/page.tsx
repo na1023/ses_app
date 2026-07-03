@@ -1,10 +1,30 @@
-export default function SalaryPage() {
+import { getCurrentUser } from "@/lib/actions";
+import { listSalary } from "@/lib/domain-actions";
+import { SalaryRecord } from "@/lib/salary";
+import AppHeader from "@/components/AppHeader";
+import SalaryClient from "./SalaryClient";
+
+export const dynamic = "force-dynamic";
+
+export default async function SalaryPage() {
+  const user = await getCurrentUser();
+  let records: SalaryRecord[] = [];
+  let err = "";
+  try {
+    records = await listSalary();
+  } catch (e) {
+    err = e instanceof Error ? e.message : String(e);
+  }
   return (
-    <div className="px-4 pt-5">
-      <h1 className="text-xl font-bold">給与</h1>
-      <p className="mt-4 text-sm" style={{ color: "var(--subtle)" }}>
-        このページは Phase 3 で実装予定です。
-      </p>
+    <div>
+      <AppHeader title="給与管理" subtitle="月収・手取り・年収サマリー" email={user?.email} />
+      {err ? (
+        <div className="mx-4 mt-4 card text-sm" style={{ color: "#f87171" }}>
+          読み込みエラー: {err}
+        </div>
+      ) : (
+        <SalaryClient records={records} />
+      )}
     </div>
   );
 }

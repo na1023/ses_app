@@ -25,12 +25,26 @@ export type Project = {
   min_hours: string;
   max_hours: string;
   standard_hours: string;
+  work_start: string;
+  work_end: string;
+  work_break: string;
   memo: string;
 };
 
 export const PROJECT_STATUSES = ["参画前", "参画中", "終了"] as const;
 
-export const DEFAULT_STANDARD_HOURS = 8;
+// 残業（法定）の基準時間／日
+export const OVERTIME_BASE_HOURS = 8;
+
+/** 案件の定時（就業時間）を h で返す。start/end 未設定なら null */
+export function scheduledHours(p: {
+  work_start: string;
+  work_end: string;
+  work_break: string;
+}): number | null {
+  if (!p.work_start || !p.work_end) return null;
+  return calcWorkHours(p.work_start, p.work_end, p.work_break || "00:00");
+}
 
 /** end_date が過去日なら true（"現在"/"継続中"/空 は継続とみなす） */
 export function isEndPassed(endDate: string): boolean {

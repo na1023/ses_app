@@ -8,7 +8,8 @@ import {
   WORK_TYPES,
   parseNum,
   effectiveStatus,
-  DEFAULT_STANDARD_HOURS,
+  scheduledHours,
+  OVERTIME_BASE_HOURS,
 } from "./constants";
 
 function genId(): string {
@@ -35,6 +36,9 @@ export type ProjectInput = {
   min_hours: string;
   max_hours: string;
   standard_hours: string;
+  work_start: string;
+  work_end: string;
+  work_break: string;
   memo: string;
 };
 
@@ -59,6 +63,9 @@ export async function saveProject(
     min_hours: input.min_hours,
     max_hours: input.max_hours,
     standard_hours: input.standard_hours,
+    work_start: input.work_start,
+    work_end: input.work_end,
+    work_break: input.work_break,
     memo: input.memo,
     user_id: user.id,
   };
@@ -92,12 +99,15 @@ export type SettlementRow = {
   company: string;
   project_name: string;
   status: string;
-  worked: number; // 当月の実働合計
+  worked: number; // 当月の現場実働合計
   min: number | null;
   max: number | null;
   shortage: number; // 下限に対する不足（0以上）
   excess: number; // 上限に対する超過（0以上）
-  state: "ok" | "short" | "over" | "none"; // 判定
+  state: "ok" | "short" | "over" | "none"; // 精算判定
+  scheduled: number | null; // 就業時間（定時/日）
+  overtime: number; // 残業（8h超）当該案件分
+  scheduleOver: number; // 就業時間超過（定時超）当該案件分
 };
 
 export type SettlementResult = {
@@ -105,7 +115,8 @@ export type SettlementResult = {
   rows: SettlementRow[];
   totalWorked: number; // 当月の総勤務時間（現場＋帰社・全案件）
   workDays: number;
-  overtime: number; // 当月の残業時間合計（日ごと 定時超過分）
+  overtime: number; // 当月の残業合計（各日 8h 超過分）
+  scheduleOver: number; // 当月の就業時間超過合計（各日 定時 超過分）
 };
 
 export async function getSettlement(ym: string): Promise<SettlementResult> {
@@ -121,36 +132,43 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     (d) => String(d.date).startsWith(ym) && WORK_TYPES.has(d.attendance_type)
   );
 
-  // 案件ごとの定時（就業時間）マップ
-  const stdByProject = new Map<string, number>();
+  // 案件ごとの定時（就業時間 h）マップ
+  const schedByProject = new Map<string, number | null>();
   projects.forEach((p) => {
-    const std = parseNum(p.standard_hours);
-    stdByProject.set(
-      `${p.company}||${p.project_name}`,
-      std ?? DEFAULT_STANDARD_HOURS
-    );
+    schedByProject.set(`${p.company}||${p.project_name}`, scheduledHours(p));
   });
 
-  // 総勤務時間 = 現場稼働 + 帰社時間。残業 = 日ごと (現場+帰社) が定時超過した分。
+  // 各日：dayTotal = 現場稼働 + 帰社時間
+  //  残業        = max(0, dayTotal - 8)          （法定8h基準）
+  //  就業時間超過 = max(0, dayTotal - 定時)        （案件の就業時間基準）
   let totalWorked = 0;
   let overtime = 0;
+  let scheduleOver = 0;
   monthDaily.forEach((d) => {
     const site = Number(d.work_hours) || 0;
     const office = parseNum(d.return_office_hours) ?? 0;
     const dayTotal = site + office;
     totalWorked += dayTotal;
-    const std =
-      stdByProject.get(`${d.company}||${d.project_name}`) ??
-      DEFAULT_STANDARD_HOURS;
-    if (dayTotal > std) overtime += dayTotal - std;
+    if (dayTotal > OVERTIME_BASE_HOURS) overtime += dayTotal - OVERTIME_BASE_HOURS;
+    const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;
+    if (sched !== null && dayTotal > sched) scheduleOver += dayTotal - sched;
   });
   const workDays = new Set(monthDaily.map((d) => d.date)).size;
 
   const rows: SettlementRow[] = projects.map((p) => {
+    const days = monthDaily.filter(
+      (d) => d.company === p.company && d.project_name === p.project_name
+    );
     // 現場の精算には帰社時間は含めない（現場稼働 work_hours のみ）
-    const worked = monthDaily
-      .filter((d) => d.company === p.company && d.project_name === p.project_name)
-      .reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
+    const worked = days.reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
+    const sched = scheduledHours(p);
+    let projOt = 0;
+    let projSched = 0;
+    days.forEach((d) => {
+      const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
+      if (dayTotal > OVERTIME_BASE_HOURS) projOt += dayTotal - OVERTIME_BASE_HOURS;
+      if (sched !== null && dayTotal > sched) projSched += dayTotal - sched;
+    });
     const min = parseNum(p.min_hours);
     const max = parseNum(p.max_hours);
     let shortage = 0;
@@ -176,6 +194,9 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       shortage,
       excess,
       state,
+      scheduled: sched,
+      overtime: projOt,
+      scheduleOver: projSched,
     };
   });
 
@@ -187,5 +208,5 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     return b.worked - a.worked;
   });
 
-  return { ym, rows, totalWorked, workDays, overtime };
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver };
 }

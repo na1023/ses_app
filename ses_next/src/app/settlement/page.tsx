@@ -47,18 +47,11 @@ export default async function SettlementPage({
         ) : data ? (
           <>
             {/* 月間サマリー */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
+            <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="metric">
                 <div className="metric-label">総勤務時間</div>
                 <div className="metric-value">
                   {data.totalWorked.toFixed(1)}
-                  <span className="metric-unit">h</span>
-                </div>
-              </div>
-              <div className="metric">
-                <div className="metric-label">残業</div>
-                <div className="metric-value" style={{ color: data.overtime > 0 ? "#f59e0b" : undefined }}>
-                  {data.overtime.toFixed(1)}
                   <span className="metric-unit">h</span>
                 </div>
               </div>
@@ -69,9 +62,23 @@ export default async function SettlementPage({
                   <span className="metric-unit">日</span>
                 </div>
               </div>
+              <div className="metric">
+                <div className="metric-label">残業（8h超）</div>
+                <div className="metric-value" style={{ color: data.overtime > 0 ? "#f59e0b" : undefined }}>
+                  {data.overtime.toFixed(1)}
+                  <span className="metric-unit">h</span>
+                </div>
+              </div>
+              <div className="metric">
+                <div className="metric-label">就業時間超過（定時超）</div>
+                <div className="metric-value" style={{ color: data.scheduleOver > 0 ? "#6366f1" : undefined }}>
+                  {data.scheduleOver.toFixed(1)}
+                  <span className="metric-unit">h</span>
+                </div>
+              </div>
             </div>
             <p className="mt-1.5 text-xs" style={{ color: "var(--subtle)" }}>
-              残業は各日 (現場＋帰社) が案件の就業時間を超えた分の合計です。
+              残業＝各日(現場＋帰社)が8hを超えた分。就業時間超過＝案件の定時を超えた分。
             </p>
 
             {/* 案件ごとの精算 */}
@@ -156,6 +163,28 @@ export default async function SettlementPage({
                           精算幅が未設定です（案件編集で下限・上限を設定できます）
                         </div>
                       )}
+
+                      {/* 残業・就業時間超過 */}
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t pt-2 text-xs" style={{ borderColor: "var(--border)" }}>
+                        <span style={{ color: "var(--subtle)" }}>
+                          定時{" "}
+                          <b style={{ color: "var(--muted)" }}>
+                            {r.scheduled !== null ? `${r.scheduled.toFixed(2)}h` : "未設定"}
+                          </b>
+                        </span>
+                        <span style={{ color: "var(--subtle)" }}>
+                          残業(8h超){" "}
+                          <b style={{ color: r.overtime > 0 ? "#f59e0b" : "var(--muted)" }}>
+                            {r.overtime.toFixed(1)}h
+                          </b>
+                        </span>
+                        <span style={{ color: "var(--subtle)" }}>
+                          就業超過{" "}
+                          <b style={{ color: r.scheduleOver > 0 ? "#6366f1" : "var(--muted)" }}>
+                            {r.scheduled !== null ? `${r.scheduleOver.toFixed(1)}h` : "—"}
+                          </b>
+                        </span>
+                      </div>
                     </li>
                   );
                 })}

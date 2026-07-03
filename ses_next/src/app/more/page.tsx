@@ -4,13 +4,14 @@ import AppHeader from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
 
-const READY = [{ href: "/salary", label: "給与管理", note: "月収・手取り" }];
-const SOON = [
-  { label: "面談・ToDo管理", note: "近日" },
-  { label: "有給・残業管理", note: "近日" },
-  { label: "レポート・グラフ", note: "近日" },
-  { label: "職務経歴生成", note: "近日" },
+const READY = [
+  { href: "/salary", label: "給与管理", note: "月収・手取り" },
+  { href: "/interviews", label: "面談・ToDo管理", note: "選考・タスク" },
+  { href: "/leave", label: "有給休暇", note: "残日数・付与" },
+  { href: "/report", label: "レポート", note: "月次集計" },
+  { href: "/career", label: "職務経歴生成", note: "経歴の自動作成" },
 ];
+const SOON: { label: string; note: string }[] = [];
 
 export default async function MorePage() {
   const user = await getCurrentUser();

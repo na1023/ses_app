@@ -7,6 +7,7 @@ import {
   PROJECT_STATUSES,
   STATUS_COLOR,
   effectiveStatus,
+  scheduledHours,
 } from "@/lib/constants";
 import { saveProject, deleteProject } from "@/lib/projects-actions";
 
@@ -20,6 +21,9 @@ const EMPTY = {
   min_hours: "",
   max_hours: "",
   standard_hours: "8",
+  work_start: "",
+  work_end: "",
+  work_break: "01:00",
   memo: "",
 };
 
@@ -49,6 +53,9 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
       min_hours: p.min_hours || "",
       max_hours: p.max_hours || "",
       standard_hours: p.standard_hours || "8",
+      work_start: p.work_start || "",
+      work_end: p.work_end || "",
+      work_break: p.work_break || "01:00",
       memo: p.memo || "",
     });
     setMsg(null);
@@ -297,21 +304,44 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
               </div>
 
               <div>
-                <label className="label">就業時間（1日の定時）</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    className="field"
-                    style={{ maxWidth: 140 }}
-                    value={form.standard_hours}
-                    onChange={(e) => setForm({ ...form, standard_hours: e.target.value })}
-                    placeholder="8"
-                  />
-                  <span className="text-sm" style={{ color: "var(--subtle)" }}>
-                    h／日　※これを超えた分を残業として計算
-                  </span>
+                <label className="label">就業時間（現場の定時）</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>開始</div>
+                    <input
+                      type="time"
+                      className="field"
+                      value={form.work_start}
+                      onChange={(e) => setForm({ ...form, work_start: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>終了</div>
+                    <input
+                      type="time"
+                      className="field"
+                      value={form.work_end}
+                      onChange={(e) => setForm({ ...form, work_end: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>休憩</div>
+                    <input
+                      type="time"
+                      className="field"
+                      value={form.work_break}
+                      onChange={(e) => setForm({ ...form, work_break: e.target.value })}
+                    />
+                  </div>
                 </div>
+                <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>
+                  {(() => {
+                    const s = scheduledHours(form);
+                    return s !== null
+                      ? `定時 ${s.toFixed(2)}h／日。残業は8h超、就業時間超過はこの定時超で算出します。`
+                      : "例 8:50〜17:10・休憩1:00。設定すると就業時間超過を算出します。";
+                  })()}
+                </p>
               </div>
 
               <div>

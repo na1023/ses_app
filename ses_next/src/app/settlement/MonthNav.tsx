@@ -8,9 +8,9 @@ function shift(ym: string, delta: number): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-export default function MonthNav({ ym }: { ym: string }) {
+export default function MonthNav({ ym, base = "/settlement" }: { ym: string; base?: string }) {
   const router = useRouter();
-  const go = (v: string) => router.push(`/settlement?ym=${v}`);
+  const go = (v: string) => router.push(`${base}?ym=${v}`);
   const [y, m] = ym.split("-");
 
   return (
