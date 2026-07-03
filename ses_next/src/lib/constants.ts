@@ -9,6 +9,7 @@ export type DailyReport = {
   break_time: string;
   work_hours: number | string;
   late_early_time: string;
+  return_office_hours: string;
   work_content: string;
   remarks: string;
   created_at: string;
@@ -23,10 +24,30 @@ export type Project = {
   end_date: string;
   min_hours: string;
   max_hours: string;
+  standard_hours: string;
   memo: string;
 };
 
 export const PROJECT_STATUSES = ["参画前", "参画中", "終了"] as const;
+
+export const DEFAULT_STANDARD_HOURS = 8;
+
+/** end_date が過去日なら true（"現在"/"継続中"/空 は継続とみなす） */
+export function isEndPassed(endDate: string): boolean {
+  const s = (endDate ?? "").trim();
+  if (!s || s === "現在" || s === "継続中" || s === "継続") return false;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return d < today;
+}
+
+/** 終了日を過ぎていれば自動的に「終了」を返す実効ステータス */
+export function effectiveStatus(status: string, endDate: string): string {
+  if (isEndPassed(endDate)) return "終了";
+  return status || "参画中";
+}
 
 export const STATUS_COLOR: Record<string, string> = {
   参画前: "#f59e0b",

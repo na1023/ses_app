@@ -6,6 +6,7 @@ import {
   Project,
   PROJECT_STATUSES,
   STATUS_COLOR,
+  effectiveStatus,
 } from "@/lib/constants";
 import { saveProject, deleteProject } from "@/lib/projects-actions";
 
@@ -18,6 +19,7 @@ const EMPTY = {
   end_date: "",
   min_hours: "",
   max_hours: "",
+  standard_hours: "8",
   memo: "",
 };
 
@@ -29,7 +31,7 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
   const [busy, start] = useTransition();
 
   const shown = projects.filter((p) =>
-    filter.length ? filter.includes(p.status || "参画中") : true
+    filter.length ? filter.includes(effectiveStatus(p.status, p.end_date)) : true
   );
 
   function openNew() {
@@ -46,6 +48,7 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
       end_date: p.end_date || "",
       min_hours: p.min_hours || "",
       max_hours: p.max_hours || "",
+      standard_hours: p.standard_hours || "8",
       memo: p.memo || "",
     });
     setMsg(null);
@@ -108,7 +111,8 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
       ) : (
         <ul className="space-y-2">
           {shown.map((p) => {
-            const color = STATUS_COLOR[p.status || "参画中"] ?? "#64748b";
+            const est = effectiveStatus(p.status, p.end_date);
+            const color = STATUS_COLOR[est] ?? "#64748b";
             const band =
               p.min_hours || p.max_hours
                 ? `精算 ${p.min_hours || "—"}〜${p.max_hours || "—"}h`
@@ -122,7 +126,7 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                         className="badge"
                         style={{ background: color + "22", color }}
                       >
-                        {p.status || "参画中"}
+                        {est}
                       </span>
                       <span className="truncate font-bold">{p.company}</span>
                     </div>
@@ -161,13 +165,13 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
       {/* フォーム（モーダル風） */}
       {form ? (
         <div
-          className="fixed inset-0 z-50 flex items-end justify-center"
+          className="fixed inset-0 z-[60] flex items-end justify-center"
           style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={() => setForm(null)}
         >
           <div
-            className="w-full max-w-xl rounded-t-2xl p-4"
-            style={{ background: "var(--surface)", maxHeight: "90vh", overflowY: "auto" }}
+            className="w-full max-w-xl rounded-t-2xl p-4 pb-8"
+            style={{ background: "var(--surface)", maxHeight: "92vh", overflowY: "auto" }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -230,12 +234,34 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                 </div>
                 <div>
                   <label className="label">終了日</label>
-                  <input
-                    type="date"
-                    className="field"
-                    value={form.end_date}
-                    onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                  />
+                  {form.end_date === "現在" ? (
+                    <div className="flex items-center gap-2">
+                      <div className="field flex-1" style={{ color: "var(--green)" }}>
+                        現在（継続中）
+                      </div>
+                      <button
+                        className="btn-ghost"
+                        onClick={() => setForm({ ...form, end_date: "" })}
+                      >
+                        日付
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        className="field flex-1"
+                        value={form.end_date}
+                        onChange={(e) => setForm({ ...form, end_date: e.target.value })}
+                      />
+                      <button
+                        className="btn-ghost whitespace-nowrap"
+                        onClick={() => setForm({ ...form, end_date: "現在" })}
+                      >
+                        現在
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -268,6 +294,24 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                 <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>
                   現場ごとの精算基準。空欄なら精算判定なし。
                 </p>
+              </div>
+
+              <div>
+                <label className="label">就業時間（1日の定時）</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    className="field"
+                    style={{ maxWidth: 140 }}
+                    value={form.standard_hours}
+                    onChange={(e) => setForm({ ...form, standard_hours: e.target.value })}
+                    placeholder="8"
+                  />
+                  <span className="text-sm" style={{ color: "var(--subtle)" }}>
+                    h／日　※これを超えた分を残業として計算
+                  </span>
+                </div>
               </div>
 
               <div>

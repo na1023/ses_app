@@ -25,6 +25,8 @@ export default function NippoForm({ companies }: { companies: string[] }) {
   const [end, setEnd] = useState("18:00");
   const [brk, setBrk] = useState("01:00");
   const [lateEarly, setLateEarly] = useState("");
+  const [isReturnDay, setIsReturnDay] = useState(false);
+  const [returnHours, setReturnHours] = useState("");
   const [content, setContent] = useState("");
   const [remarks, setRemarks] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -32,7 +34,9 @@ export default function NippoForm({ companies }: { companies: string[] }) {
 
   const isWork = WORK_TYPES.has(att);
   const isLate = LATE_EARLY_TYPES.has(att);
-  const wh = isWork ? calcWorkHours(start, end, brk) : 0;
+  const siteH = isWork ? calcWorkHours(start, end, brk) : 0;
+  const officeH = isReturnDay ? parseFloat(returnHours) || 0 : 0;
+  const dayTotal = siteH + officeH; // その日の勤務時間
 
   function submit() {
     setMsg(null);
@@ -46,6 +50,7 @@ export default function NippoForm({ companies }: { companies: string[] }) {
         end_time: end,
         break_time: brk,
         late_early_time: lateEarly,
+        return_office_hours: isReturnDay ? returnHours : "0",
         work_content: content,
         remarks,
       });
@@ -54,6 +59,8 @@ export default function NippoForm({ companies }: { companies: string[] }) {
         setContent("");
         setRemarks("");
         setLateEarly("");
+        setReturnHours("");
+        setIsReturnDay(false);
       }
     });
   }
@@ -144,7 +151,47 @@ export default function NippoForm({ companies }: { companies: string[] }) {
             className="rounded-xl px-3 py-2 text-sm"
             style={{ background: "#0c1a2e", color: "#60a5fa" }}
           >
-            実働時間（自動）: <b>{wh.toFixed(2)} h</b>
+            現場稼働（自動）: <b>{siteH.toFixed(2)} h</b>
+            {isReturnDay ? (
+              <>
+                {" ＋ 帰社 "}
+                <b>{officeH.toFixed(2)} h</b>
+                {" ＝ この日の勤務 "}
+                <b>{dayTotal.toFixed(2)} h</b>
+              </>
+            ) : null}
+          </div>
+
+          {/* 帰社日 */}
+          <div className="rounded-xl p-3" style={{ border: "1px solid var(--border)" }}>
+            <label className="flex items-center justify-between">
+              <span className="text-sm font-semibold">帰社日（自社に戻って勤務）</span>
+              <input
+                type="checkbox"
+                className="h-5 w-5"
+                checked={isReturnDay}
+                onChange={(e) => setIsReturnDay(e.target.checked)}
+              />
+            </label>
+            {isReturnDay ? (
+              <div className="mt-3">
+                <label className="label">帰社時間 (h)</label>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  step="0.25"
+                  min="0"
+                  max="12"
+                  className="field"
+                  value={returnHours}
+                  onChange={(e) => setReturnHours(e.target.value)}
+                  placeholder="例: 2"
+                />
+                <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>
+                  現場は早退し、退勤時刻は現場を出た時刻にしてください。帰社時間は現場の稼働には含めず、この日の勤務時間として加算します。
+                </p>
+              </div>
+            ) : null}
           </div>
 
           {isLate ? (

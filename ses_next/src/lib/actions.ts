@@ -61,6 +61,7 @@ export type DailyInput = {
   end_time: string;
   break_time: string;
   late_early_time: string;
+  return_office_hours: string;
   work_content: string;
   remarks: string;
 };
@@ -92,6 +93,10 @@ export async function createDaily(
     LATE_EARLY_TYPES.has(input.attendance_type) && input.late_early_time
       ? String(parseFloat(input.late_early_time) || 0)
       : "0";
+  const returnOffice =
+    isWork && input.return_office_hours
+      ? String(parseFloat(input.return_office_hours) || 0)
+      : "0";
 
   const row = {
     id: genId(),
@@ -105,6 +110,7 @@ export async function createDaily(
     break_time: isWork ? input.break_time : "",
     work_hours: wh,
     late_early_time: lateEarly,
+    return_office_hours: returnOffice,
     work_content: isWork ? input.work_content.trim() : "",
     remarks: input.remarks.trim(),
     created_at: new Date().toISOString().slice(0, 16).replace("T", " "),

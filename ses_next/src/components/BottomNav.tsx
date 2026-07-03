@@ -29,7 +29,7 @@ export default function BottomNav() {
             <li key={it.href} className="flex-1">
               <Link
                 href={it.href}
-                className="flex flex-col items-center gap-0.5 py-2.5 text-xs font-semibold"
+                className="flex flex-col items-center gap-1 py-3.5 text-xs font-semibold"
                 style={{ color: active ? "var(--accent)" : "var(--subtle)" }}
               >
                 <span className="text-lg leading-none">{it.icon}</span>

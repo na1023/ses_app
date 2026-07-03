@@ -47,11 +47,18 @@ export default async function SettlementPage({
         ) : data ? (
           <>
             {/* 月間サマリー */}
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2">
               <div className="metric">
-                <div className="metric-label">当月の総勤務時間</div>
+                <div className="metric-label">総勤務時間</div>
                 <div className="metric-value">
                   {data.totalWorked.toFixed(1)}
+                  <span className="metric-unit">h</span>
+                </div>
+              </div>
+              <div className="metric">
+                <div className="metric-label">残業</div>
+                <div className="metric-value" style={{ color: data.overtime > 0 ? "#f59e0b" : undefined }}>
+                  {data.overtime.toFixed(1)}
                   <span className="metric-unit">h</span>
                 </div>
               </div>
@@ -63,6 +70,9 @@ export default async function SettlementPage({
                 </div>
               </div>
             </div>
+            <p className="mt-1.5 text-xs" style={{ color: "var(--subtle)" }}>
+              残業は各日 (現場＋帰社) が案件の就業時間を超えた分の合計です。
+            </p>
 
             {/* 案件ごとの精算 */}
             <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>

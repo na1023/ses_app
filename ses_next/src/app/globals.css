@@ -30,7 +30,7 @@ body {
 }
 
 .safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 6rem);
 }
 
 /* ===== ヘッダー ===== */

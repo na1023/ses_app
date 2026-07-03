@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "./supabase/server";
-import { Project, DailyReport, WORK_TYPES, parseNum } from "./constants";
+import {
+  Project,
+  DailyReport,
+  WORK_TYPES,
+  parseNum,
+  effectiveStatus,
+  DEFAULT_STANDARD_HOURS,
+} from "./constants";
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -27,6 +34,7 @@ export type ProjectInput = {
   end_date: string;
   min_hours: string;
   max_hours: string;
+  standard_hours: string;
   memo: string;
 };
 
@@ -50,6 +58,7 @@ export async function saveProject(
     end_date: input.end_date,
     min_hours: input.min_hours,
     max_hours: input.max_hours,
+    standard_hours: input.standard_hours,
     memo: input.memo,
     user_id: user.id,
   };
@@ -94,8 +103,9 @@ export type SettlementRow = {
 export type SettlementResult = {
   ym: string;
   rows: SettlementRow[];
-  totalWorked: number; // 当月の総勤務時間（全案件・勤務日）
+  totalWorked: number; // 当月の総勤務時間（現場＋帰社・全案件）
   workDays: number;
+  overtime: number; // 当月の残業時間合計（日ごと 定時超過分）
 };
 
 export async function getSettlement(ym: string): Promise<SettlementResult> {
@@ -108,22 +118,38 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   const daily = (dailyData ?? []) as DailyReport[];
 
   const monthDaily = daily.filter(
-    (d) =>
-      String(d.date).startsWith(ym) && WORK_TYPES.has(d.attendance_type)
+    (d) => String(d.date).startsWith(ym) && WORK_TYPES.has(d.attendance_type)
   );
 
-  const totalWorked = monthDaily.reduce(
-    (s, d) => s + (Number(d.work_hours) || 0),
-    0
-  );
+  // 案件ごとの定時（就業時間）マップ
+  const stdByProject = new Map<string, number>();
+  projects.forEach((p) => {
+    const std = parseNum(p.standard_hours);
+    stdByProject.set(
+      `${p.company}||${p.project_name}`,
+      std ?? DEFAULT_STANDARD_HOURS
+    );
+  });
+
+  // 総勤務時間 = 現場稼働 + 帰社時間。残業 = 日ごと (現場+帰社) が定時超過した分。
+  let totalWorked = 0;
+  let overtime = 0;
+  monthDaily.forEach((d) => {
+    const site = Number(d.work_hours) || 0;
+    const office = parseNum(d.return_office_hours) ?? 0;
+    const dayTotal = site + office;
+    totalWorked += dayTotal;
+    const std =
+      stdByProject.get(`${d.company}||${d.project_name}`) ??
+      DEFAULT_STANDARD_HOURS;
+    if (dayTotal > std) overtime += dayTotal - std;
+  });
   const workDays = new Set(monthDaily.map((d) => d.date)).size;
 
   const rows: SettlementRow[] = projects.map((p) => {
+    // 現場の精算には帰社時間は含めない（現場稼働 work_hours のみ）
     const worked = monthDaily
-      .filter(
-        (d) =>
-          d.company === p.company && d.project_name === p.project_name
-      )
+      .filter((d) => d.company === p.company && d.project_name === p.project_name)
       .reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
     const min = parseNum(p.min_hours);
     const max = parseNum(p.max_hours);
@@ -143,7 +169,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       project_id: p.id,
       company: p.company,
       project_name: p.project_name,
-      status: p.status,
+      status: effectiveStatus(p.status, p.end_date),
       worked,
       min,
       max,
@@ -161,5 +187,5 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     return b.worked - a.worked;
   });
 
-  return { ym, rows, totalWorked, workDays };
+  return { ym, rows, totalWorked, workDays, overtime };
 }
