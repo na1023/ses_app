@@ -14,6 +14,32 @@ export type DailyReport = {
   created_at: string;
 };
 
+export type Project = {
+  id: string;
+  company: string;
+  project_name: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  min_hours: string;
+  max_hours: string;
+  memo: string;
+};
+
+export const PROJECT_STATUSES = ["参画前", "参画中", "終了"] as const;
+
+export const STATUS_COLOR: Record<string, string> = {
+  参画前: "#f59e0b",
+  参画中: "#10b981",
+  終了: "#64748b",
+};
+
+export function parseNum(v: string | number | null | undefined): number | null {
+  if (v === null || v === undefined || String(v).trim() === "") return null;
+  const n = parseFloat(String(v).replace(",", ""));
+  return Number.isNaN(n) ? null : n;
+}
+
 export const ATTENDANCE_OPTIONS = [
   "出社",
   "在宅",

@@ -3,13 +3,18 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0f1117;
+  --bg: #0e1016;
   --surface: #161b27;
-  --border: #1e2a3a;
-  --text: #e2e8f0;
+  --surface-2: #1a2130;
+  --border: #223044;
+  --text: #e6edf6;
   --muted: #94a3b8;
   --subtle: #64748b;
   --accent: #3b82f6;
+  --accent-2: #6366f1;
+  --green: #10b981;
+  --amber: #f59e0b;
+  --red: #ef4444;
 }
 
 html,
@@ -17,47 +22,58 @@ body {
   background: var(--bg);
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
+  font-feature-settings: "palt";
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* iOS のセーフエリア対応 */
 .safe-bottom {
-  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 4.5rem);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem);
 }
 
-/* 入力系の共通スタイル（スマホで押しやすい高さ） */
+/* ===== ヘッダー ===== */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: linear-gradient(180deg, rgba(14, 16, 22, 0.96), rgba(14, 16, 22, 0.82));
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+/* ===== 入力 ===== */
 .field {
   width: 100%;
   background: #0f1420;
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 0.85rem 0.9rem;
+  padding: 0.8rem 0.9rem;
   color: var(--text);
   font-size: 1rem;
   outline: none;
+  transition: border-color 0.12s;
 }
 .field:focus {
   border-color: var(--accent);
 }
 .label {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: var(--muted);
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.3rem;
   font-weight: 600;
 }
 
-/* チップ（勤怠区分の選択） */
+/* ===== チップ ===== */
 .chip {
-  padding: 0.55rem 0.9rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 600;
   white-space: nowrap;
   transition: all 0.12s;
@@ -67,13 +83,54 @@ body {
   border-color: transparent;
 }
 
+/* ===== カード ===== */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: 16px;
   padding: 1rem;
 }
+.card-hover:active {
+  background: var(--surface-2);
+}
 
+/* ===== バッジ ===== */
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ===== メトリクス ===== */
+.metric {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0.85rem 0.9rem;
+}
+.metric-label {
+  font-size: 0.72rem;
+  color: var(--subtle);
+  font-weight: 600;
+}
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+  margin-top: 0.15rem;
+}
+.metric-unit {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-left: 0.15rem;
+  font-weight: 600;
+}
+
+/* ===== ボタン ===== */
 .btn-primary {
   width: 100%;
   background: var(--accent);
@@ -81,12 +138,59 @@ body {
   font-weight: 700;
   font-size: 1.02rem;
   border-radius: 12px;
-  padding: 0.95rem;
-  transition: opacity 0.12s;
+  padding: 0.9rem;
+  transition: opacity 0.12s, transform 0.05s;
 }
 .btn-primary:active {
-  opacity: 0.85;
+  opacity: 0.9;
+  transform: scale(0.99);
 }
 .btn-primary:disabled {
   opacity: 0.5;
+}
+.btn-ghost {
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.btn-ghost:active {
+  background: var(--surface-2);
+}
+
+/* ===== セグメント（タブ） ===== */
+.seg {
+  display: flex;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 3px;
+}
+.seg button {
+  flex: 1;
+  padding: 0.45rem 0.5rem;
+  border-radius: 9px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.seg button[data-active="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* ===== 進捗バー ===== */
+.bar-track {
+  height: 8px;
+  background: #0f1420;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.bar-fill {
+  height: 100%;
+  border-radius: 999px;
 }

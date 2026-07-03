@@ -1,7 +1,7 @@
 import { listRecentDaily, listCompanies, getCurrentUser } from "@/lib/actions";
 import { ATT_COLOR, LATE_EARLY_TYPES } from "@/lib/constants";
 import NippoForm from "./NippoForm";
-import AccountBar from "@/components/AccountBar";
+import AppHeader from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +20,9 @@ export default async function NippoPage() {
   }
 
   return (
-    <div className="px-4 pt-5">
-      {user ? <AccountBar email={user.email} /> : null}
-      <header className="mb-4">
-        <h1 className="text-xl font-bold">日報</h1>
-        <p className="text-xs" style={{ color: "var(--subtle)" }}>
-          今日の勤務をサクッと記録
-        </p>
-      </header>
+    <div>
+      <AppHeader title="日報" subtitle="今日の勤務をサクッと記録" email={user?.email} />
+      <div className="px-4 pt-4">
 
       {loadError ? (
         <div
@@ -93,6 +88,7 @@ export default async function NippoPage() {
           </ul>
         )}
       </section>
+      </div>
     </div>
   );
 }
