@@ -26,7 +26,8 @@ export default function NippoForm({ companies }: { companies: string[] }) {
   const [brk, setBrk] = useState("01:00");
   const [lateEarly, setLateEarly] = useState("");
   const [isReturnDay, setIsReturnDay] = useState(false);
-  const [returnHours, setReturnHours] = useState("");
+  const [returnStart, setReturnStart] = useState("18:00");
+  const [returnEnd, setReturnEnd] = useState("20:00");
   const [content, setContent] = useState("");
   const [remarks, setRemarks] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -35,7 +36,7 @@ export default function NippoForm({ companies }: { companies: string[] }) {
   const isWork = WORK_TYPES.has(att);
   const isLate = LATE_EARLY_TYPES.has(att);
   const siteH = isWork ? calcWorkHours(start, end, brk) : 0;
-  const officeH = isReturnDay ? parseFloat(returnHours) || 0 : 0;
+  const officeH = isReturnDay ? calcWorkHours(returnStart, returnEnd, "00:00") : 0;
   const dayTotal = siteH + officeH; // その日の勤務時間
 
   function submit() {
@@ -50,7 +51,7 @@ export default function NippoForm({ companies }: { companies: string[] }) {
         end_time: end,
         break_time: brk,
         late_early_time: lateEarly,
-        return_office_hours: isReturnDay ? returnHours : "0",
+        return_office_hours: isReturnDay ? String(Math.round(officeH * 100) / 100) : "0",
         work_content: content,
         remarks,
       });
@@ -59,7 +60,6 @@ export default function NippoForm({ companies }: { companies: string[] }) {
         setContent("");
         setRemarks("");
         setLateEarly("");
-        setReturnHours("");
         setIsReturnDay(false);
       }
     });
@@ -175,20 +175,19 @@ export default function NippoForm({ companies }: { companies: string[] }) {
             </label>
             {isReturnDay ? (
               <div className="mt-3">
-                <label className="label">帰社時間 (h)</label>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  step="0.25"
-                  min="0"
-                  max="12"
-                  className="field"
-                  value={returnHours}
-                  onChange={(e) => setReturnHours(e.target.value)}
-                  placeholder="例: 2"
-                />
+                <label className="label">帰社（自社での勤務時間）</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>開始</div>
+                    <input type="time" className="field" value={returnStart} onChange={(e) => setReturnStart(e.target.value)} />
+                  </div>
+                  <div>
+                    <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>終了</div>
+                    <input type="time" className="field" value={returnEnd} onChange={(e) => setReturnEnd(e.target.value)} />
+                  </div>
+                </div>
                 <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>
-                  現場は早退し、退勤時刻は現場を出た時刻にしてください。帰社時間は現場の稼働には含めず、この日の勤務時間として加算します。
+                  帰社 {officeH.toFixed(2)}h。現場は早退し退勤時刻は現場を出た時刻に。帰社分は現場の稼働に含めず、この日の勤務時間として加算します。
                 </p>
               </div>
             ) : null}

@@ -104,20 +104,34 @@ export type SettlementRow = {
   max: number | null;
   shortage: number; // 下限に対する不足（0以上）
   excess: number; // 上限に対する超過（0以上）
-  state: "ok" | "short" | "over" | "none"; // 精算判定
+  state: "ok" | "short" | "over" | "none"; // 精算判定（確定ベース）
   scheduled: number | null; // 就業時間（定時/日）
   overtime: number; // 残業（8h超）当該案件分
   scheduleOver: number; // 就業時間超過（定時超）当該案件分
+  projected: number | null; // 月末見込み稼働（現在ペース）
+  pace: "ontrack" | "behind" | "overpace" | "done" | "none"; // 現在ペース判定
 };
+
+export type LawWarning = { level: "danger" | "warn" | "info"; text: string };
 
 export type SettlementResult = {
   ym: string;
   rows: SettlementRow[];
-  totalWorked: number; // 当月の総勤務時間（現場＋帰社・全案件）
+  totalWorked: number;
   workDays: number;
-  overtime: number; // 当月の残業合計（各日 8h 超過分）
-  scheduleOver: number; // 当月の就業時間超過合計（各日 定時 超過分）
+  overtime: number;
+  scheduleOver: number;
+  annualOvertime: number; // 当年の残業累計（1〜当月）
+  monthComplete: boolean; // 当月がすでに終了しているか
+  warnings: LawWarning[];
 };
+
+function parseDate(s: string): Date | null {
+  const t = (s ?? "").trim();
+  if (!t || t === "現在" || t === "継続中" || t === "継続") return null;
+  const d = new Date(t);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
 
 export async function getSettlement(ym: string): Promise<SettlementResult> {
   const sb = createClient();
@@ -128,26 +142,35 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   const projects = (projData ?? []) as Project[];
   const daily = (dailyData ?? []) as DailyReport[];
 
+  const [yy, mm] = ym.split("-").map(Number);
+  const monthStart = new Date(yy, mm - 1, 1);
+  const monthEnd = new Date(yy, mm, 0); // 当月末日
+  const daysInMonth = monthEnd.getDate();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const monthComplete = today > monthEnd;
+  // 経過割合（当月内で今日までに経過した日数の割合）
+  let elapsed = 1;
+  if (today < monthStart) elapsed = 0;
+  else if (!monthComplete)
+    elapsed = Math.min(1, (today.getDate()) / daysInMonth);
+
   const monthDaily = daily.filter(
     (d) => String(d.date).startsWith(ym) && WORK_TYPES.has(d.attendance_type)
   );
 
-  // 案件ごとの定時（就業時間 h）マップ
   const schedByProject = new Map<string, number | null>();
-  projects.forEach((p) => {
-    schedByProject.set(`${p.company}||${p.project_name}`, scheduledHours(p));
-  });
+  projects.forEach((p) =>
+    schedByProject.set(`${p.company}||${p.project_name}`, scheduledHours(p))
+  );
 
-  // 各日：dayTotal = 現場稼働 + 帰社時間
-  //  残業        = max(0, dayTotal - 8)          （法定8h基準）
-  //  就業時間超過 = max(0, dayTotal - 定時)        （案件の就業時間基準）
+  // 月間集計（実績）
   let totalWorked = 0;
   let overtime = 0;
   let scheduleOver = 0;
   monthDaily.forEach((d) => {
-    const site = Number(d.work_hours) || 0;
-    const office = parseNum(d.return_office_hours) ?? 0;
-    const dayTotal = site + office;
+    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
     totalWorked += dayTotal;
     if (dayTotal > OVERTIME_BASE_HOURS) overtime += dayTotal - OVERTIME_BASE_HOURS;
     const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;
@@ -155,11 +178,31 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   });
   const workDays = new Set(monthDaily.map((d) => d.date)).size;
 
-  const rows: SettlementRow[] = projects.map((p) => {
+  // 年間残業累計（当年1月〜当月まで）
+  let annualOvertime = 0;
+  daily.forEach((d) => {
+    if (!WORK_TYPES.has(d.attendance_type)) return;
+    const ds = String(d.date);
+    if (ds.slice(0, 4) !== String(yy)) return;
+    if (ds.slice(0, 7) > ym) return; // 当月より後は除外
+    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
+    if (dayTotal > OVERTIME_BASE_HOURS) annualOvertime += dayTotal - OVERTIME_BASE_HOURS;
+  });
+
+  const rows: SettlementRow[] = [];
+  projects.forEach((p) => {
+    const est = effectiveStatus(p.status, p.end_date);
+    const end = parseDate(p.end_date);
+    // 当月開始より前に終了した案件は、この月以降 表示しない
+    if (end && end < monthStart) return;
+
+    // 終了案件は終了日以降の日を含めない
     const days = monthDaily.filter(
-      (d) => d.company === p.company && d.project_name === p.project_name
+      (d) =>
+        d.company === p.company &&
+        d.project_name === p.project_name &&
+        (!end || new Date(d.date) <= end)
     );
-    // 現場の精算には帰社時間は含めない（現場稼働 work_hours のみ）
     const worked = days.reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
     const sched = scheduledHours(p);
     let projOt = 0;
@@ -169,38 +212,40 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       if (dayTotal > OVERTIME_BASE_HOURS) projOt += dayTotal - OVERTIME_BASE_HOURS;
       if (sched !== null && dayTotal > sched) projSched += dayTotal - sched;
     });
+
     const min = parseNum(p.min_hours);
     const max = parseNum(p.max_hours);
     let shortage = 0;
     let excess = 0;
     let state: SettlementRow["state"] = "none";
-    if (min !== null && worked < min) {
-      shortage = min - worked;
-      state = "short";
-    } else if (max !== null && worked > max) {
-      excess = worked - max;
-      state = "over";
-    } else if (min !== null || max !== null) {
-      state = "ok";
+    if (min !== null && worked < min) { shortage = min - worked; state = "short"; }
+    else if (max !== null && worked > max) { excess = worked - max; state = "over"; }
+    else if (min !== null || max !== null) state = "ok";
+
+    // 現在ペースの月末見込み
+    const projectComplete = monthComplete || (end !== null && end <= today);
+    let projected: number | null = null;
+    let pace: SettlementRow["pace"] = "none";
+    if (min !== null || max !== null) {
+      if (projectComplete) {
+        projected = worked;
+        pace = "done";
+      } else if (elapsed > 0) {
+        projected = worked / elapsed;
+        if (max !== null && projected > max) pace = "overpace";
+        else if (min !== null && projected < min) pace = "behind";
+        else pace = "ontrack";
+      }
     }
-    return {
-      project_id: p.id,
-      company: p.company,
-      project_name: p.project_name,
-      status: effectiveStatus(p.status, p.end_date),
-      worked,
-      min,
-      max,
-      shortage,
-      excess,
-      state,
-      scheduled: sched,
-      overtime: projOt,
-      scheduleOver: projSched,
-    };
+
+    rows.push({
+      project_id: p.id, company: p.company, project_name: p.project_name,
+      status: est, worked, min, max, shortage, excess, state,
+      scheduled: sched, overtime: projOt, scheduleOver: projSched,
+      projected, pace,
+    });
   });
 
-  // 稼働のある案件・精算幅が設定された案件を優先表示
   rows.sort((a, b) => {
     const aw = a.worked > 0 || a.min !== null || a.max !== null ? 0 : 1;
     const bw = b.worked > 0 || b.min !== null || b.max !== null ? 0 : 1;
@@ -208,5 +253,37 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     return b.worked - a.worked;
   });
 
-  return { ym, rows, totalWorked, workDays, overtime, scheduleOver };
+  // ===== 労働基準法チェック =====
+  const warnings: LawWarning[] = [];
+  if (overtime > 80)
+    warnings.push({ level: "danger", text: `当月の残業が${overtime.toFixed(0)}hです。過労死ライン(月80h)を超えています。労働時間の削減が必要です。` });
+  else if (overtime > 45)
+    warnings.push({ level: "warn", text: `当月の残業が${overtime.toFixed(0)}hです。36協定の原則上限(月45h)を超えています。` });
+  if (annualOvertime > 360)
+    warnings.push({ level: "danger", text: `当年の残業累計が${annualOvertime.toFixed(0)}hです。年間上限(360h)を超えています。` });
+  else if (annualOvertime > 288)
+    warnings.push({ level: "info", text: `当年の残業累計が${annualOvertime.toFixed(0)}hです。年間上限(360h)の8割を超えています。` });
+
+  // 1日の勤務が長すぎる日（休憩後の実働が長い）
+  const longDay = monthDaily.find(
+    (d) => (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0) > 13
+  );
+  if (longDay)
+    warnings.push({ level: "warn", text: `1日の勤務が13時間を超える日があります（${longDay.date}）。休憩・健康管理にご注意ください。` });
+
+  // 連続勤務日数（当月内）
+  const dset = Array.from(new Set(monthDaily.map((d) => d.date))).sort();
+  let run = 0, maxRun = 0;
+  let prev: Date | null = null;
+  dset.forEach((ds) => {
+    const cur = new Date(ds);
+    if (prev && (cur.getTime() - prev.getTime()) === 86400000) run += 1;
+    else run = 1;
+    maxRun = Math.max(maxRun, run);
+    prev = cur;
+  });
+  if (maxRun >= 7)
+    warnings.push({ level: "warn", text: `${maxRun}日連続勤務があります。労基法は週1日以上の休日を求めています。` });
+
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings };
 }

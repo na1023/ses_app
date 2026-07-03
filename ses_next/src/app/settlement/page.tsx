@@ -46,6 +46,23 @@ export default async function SettlementPage({
           </div>
         ) : data ? (
           <>
+            {/* 労働基準法 警告 */}
+            {data.warnings.length > 0 ? (
+              <div className="mt-4 space-y-2">
+                {data.warnings.map((w, i) => {
+                  const c = w.level === "danger" ? "#ef4444" : w.level === "warn" ? "#f59e0b" : "#3b82f6";
+                  return (
+                    <div key={i} className="card text-sm" style={{ borderColor: c, background: c + "12" }}>
+                      <span style={{ color: c, fontWeight: 700 }}>
+                        {w.level === "danger" ? "⚠ 重大" : w.level === "warn" ? "⚠ 注意" : "ℹ 参考"}
+                      </span>{" "}
+                      <span style={{ color: "var(--text)" }}>{w.text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
             {/* 月間サマリー */}
             <div className="mt-4 grid grid-cols-2 gap-2">
               <div className="metric">
@@ -157,6 +174,20 @@ export default async function SettlementPage({
                               ? `上限を ${r.excess.toFixed(1)} h 超過`
                               : "精算幅の範囲内（適正）"}
                           </div>
+                          {/* 現在ペース（月途中のみ） */}
+                          {r.pace !== "done" && r.pace !== "none" && r.projected !== null ? (
+                            (() => {
+                              const pc =
+                                r.pace === "behind" ? "#ef4444" : r.pace === "overpace" ? "#f59e0b" : "#10b981";
+                              const label =
+                                r.pace === "behind" ? "このままだと不足ペース" : r.pace === "overpace" ? "上限超過ペース" : "順調（足りるペース）";
+                              return (
+                                <div className="mt-1 text-xs" style={{ color: pc }}>
+                                  現在ペース：月末見込み <b>{r.projected.toFixed(0)}h</b> → {label}
+                                </div>
+                              );
+                            })()
+                          ) : null}
                         </>
                       ) : (
                         <div className="mt-1.5 text-xs" style={{ color: "var(--subtle)" }}>

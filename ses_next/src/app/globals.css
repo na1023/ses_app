@@ -68,15 +68,22 @@ body {
 
 /* ===== チップ ===== */
 .chip {
-  padding: 0.5rem 0.85rem;
+  padding: 0.55rem 1rem;
+  min-height: 2.5rem;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   font-weight: 600;
   white-space: nowrap;
   transition: all 0.12s;
+}
+.chip:active {
+  transform: scale(0.97);
+}
+.seg button {
+  min-height: 2.6rem;
 }
 .chip[data-active="true"] {
   color: #fff;
@@ -152,12 +159,14 @@ body {
   border: 1px solid var(--border);
   color: var(--muted);
   border-radius: 10px;
-  padding: 0.5rem 0.9rem;
+  padding: 0.55rem 1rem;
+  min-height: 2.6rem;
   font-weight: 600;
   font-size: 0.9rem;
 }
 .btn-ghost:active {
   background: var(--surface-2);
+  transform: scale(0.98);
 }
 
 /* ===== セグメント（タブ） ===== */
