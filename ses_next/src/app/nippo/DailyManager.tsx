@@ -4,8 +4,9 @@ import { useMemo, useState, useTransition } from "react";
 import {
   ATTENDANCE_OPTIONS,
   ATT_COLOR,
-  WORK_TYPES,
   LATE_EARLY_TYPES,
+  countsAsWork,
+  hhmmToMin,
   Project,
   DailyReport,
   WorkSession,
@@ -39,6 +40,7 @@ type FormState = {
   company: string;
   project: string;
   sessions: WorkSession[];
+  breakTime: string;
   lateEarly: string;
   isReturn: boolean;
   returnStart: string;
@@ -54,6 +56,7 @@ function emptyForm(): FormState {
     company: "",
     project: "",
     sessions: [{ start: "09:00", end: "18:00" }],
+    breakTime: "01:00",
     lateEarly: "",
     isReturn: false,
     returnStart: "18:00",
@@ -72,6 +75,7 @@ function fromReport(r: DailyReport): FormState {
     company: r.company || "",
     project: r.project_name || "",
     sessions: sess.length ? sess : r.start_time && r.end_time ? [{ start: r.start_time, end: r.end_time }] : [{ start: "09:00", end: "18:00" }],
+    breakTime: r.break_time || "00:00",
     lateEarly: r.late_early_time && r.late_early_time !== "0" ? r.late_early_time : "",
     isReturn: !!r.return_office_hours && r.return_office_hours !== "0",
     returnStart: "18:00",
@@ -114,6 +118,7 @@ export default function DailyManager({
       project_name: f.project,
       attendance_type: f.att,
       sessions: f.sessions,
+      break_time: f.breakTime,
       late_early_time: LATE_EARLY_TYPES.has(f.att) ? f.lateEarly : "0",
       return_office_hours: f.isReturn ? String(Math.round(officeH * 100) / 100) : "0",
       work_content: f.content,
@@ -238,7 +243,7 @@ function Fields({
   projects: Project[];
   dupWarn: boolean;
 }) {
-  const isWork = WORK_TYPES.has(f.att);
+  const needsTime = countsAsWork(f.att);
   const isLate = LATE_EARLY_TYPES.has(f.att);
   const set = (patch: Partial<FormState>) => setF((p) => ({ ...p, ...patch }));
 
@@ -246,7 +251,10 @@ function Fields({
   const companies = Array.from(new Set(active.map((p) => p.company))).sort();
   const projOptions = active.filter((p) => p.company === f.company).map((p) => p.project_name);
 
-  const siteH = isWork ? sessionsHours(f.sessions.filter((s) => s.start && s.end)) : 0;
+  const breakH = (hhmmToMin(f.breakTime || "") ?? 0) / 60;
+  const siteH = needsTime
+    ? Math.max(0, sessionsHours(f.sessions.filter((s) => s.start && s.end)) - breakH)
+    : 0;
   const officeH = f.isReturn ? calcWorkHours(f.returnStart, f.returnEnd, "00:00") : 0;
 
   return (
@@ -272,7 +280,7 @@ function Fields({
         </div>
       </div>
 
-      {isWork ? (
+      {needsTime ? (
         <>
           {/* 会社・案件（指定日に参画中の案件から） */}
           <div className="grid grid-cols-2 gap-3">
@@ -312,6 +320,17 @@ function Fields({
                 </div>
               ))}
               <button className="btn-ghost" onClick={() => set({ sessions: [...f.sessions, { start: "", end: "" }] })}>＋ 時間帯を追加</button>
+            </div>
+          </div>
+
+          {/* 休憩 */}
+          <div>
+            <label className="label">休憩時間</label>
+            <div className="flex items-center gap-2">
+              <div style={{ maxWidth: 140 }}>
+                <TimeInput value={f.breakTime} onChange={(v) => set({ breakTime: v })} placeholder="01:00" />
+              </div>
+              <span className="text-xs" style={{ color: "var(--subtle)" }}>実働から差し引きます（休憩なしは 00:00）</span>
             </div>
           </div>
 

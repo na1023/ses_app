@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/actions";
 import { listAllDaily } from "@/lib/domain-actions";
-import { DailyReport, WORK_TYPES, ATT_COLOR, parseNum } from "@/lib/constants";
+import { DailyReport, countsAsWork, ATT_COLOR, parseNum } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "../settlement/MonthNav";
 
@@ -24,7 +24,7 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
   }
 
   const month = daily.filter((d) => String(d.date).startsWith(ym));
-  const workRows = month.filter((d) => WORK_TYPES.has(d.attendance_type));
+  const workRows = month.filter((d) => countsAsWork(d.attendance_type));
   const siteHours = workRows.reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
   const officeHours = workRows.reduce((s, d) => s + (parseNum(d.return_office_hours) ?? 0), 0);
   const total = siteHours + officeHours;

@@ -8,6 +8,8 @@ import {
   WORK_TYPES,
   LATE_EARLY_TYPES,
   sessionsHours,
+  countsAsWork,
+  hhmmToMin,
 } from "./constants";
 
 function genId(): string {
@@ -59,6 +61,7 @@ export type DailyInput = {
   project_name: string;
   attendance_type: string;
   sessions: WorkSession[]; // 出勤・退勤（複数可）
+  break_time: string; // 休憩(HH:MM)
   late_early_time: string;
   return_office_hours: string;
   work_content: string;
@@ -66,15 +69,18 @@ export type DailyInput = {
 };
 
 function buildRow(input: DailyInput, userId: string) {
-  const isWork = WORK_TYPES.has(input.attendance_type);
+  const needsTime = countsAsWork(input.attendance_type);
   const validSessions = (input.sessions || []).filter((s) => s.start && s.end);
-  const wh = isWork ? Math.round(sessionsHours(validSessions) * 100) / 100 : 0;
+  const breakH = (hhmmToMin(input.break_time || "") ?? 0) / 60;
+  const wh = needsTime
+    ? Math.max(0, Math.round((sessionsHours(validSessions) - breakH) * 100) / 100)
+    : 0;
   const lateEarly =
     LATE_EARLY_TYPES.has(input.attendance_type) && input.late_early_time
       ? String(parseFloat(input.late_early_time) || 0)
       : "0";
   const returnOffice =
-    isWork && input.return_office_hours
+    needsTime && input.return_office_hours
       ? String(parseFloat(input.return_office_hours) || 0)
       : "0";
   const first = validSessions[0];
@@ -85,23 +91,22 @@ function buildRow(input: DailyInput, userId: string) {
     company: input.company || "",
     project_name: input.project_name || "",
     attendance_type: input.attendance_type,
-    start_time: isWork && first ? first.start : "",
-    end_time: isWork && last ? last.end : "",
-    break_time: "",
+    start_time: needsTime && first ? first.start : "",
+    end_time: needsTime && last ? last.end : "",
+    break_time: needsTime ? input.break_time || "" : "",
     work_hours: wh,
     late_early_time: lateEarly,
     return_office_hours: returnOffice,
-    work_sessions: isWork ? JSON.stringify(validSessions) : "",
-    work_content: isWork ? input.work_content.trim() : "",
+    work_sessions: needsTime ? JSON.stringify(validSessions) : "",
+    work_content: needsTime ? input.work_content.trim() : "",
     remarks: input.remarks.trim(),
     _wh: wh,
   };
 }
 
 function validate(input: DailyInput): string | null {
-  const isWork = WORK_TYPES.has(input.attendance_type);
   if (!input.date) return "日付を入力してください。";
-  if (isWork) {
+  if (WORK_TYPES.has(input.attendance_type)) {
     if (!input.company) return "会社名を選択してください。";
     const valid = (input.sessions || []).filter((s) => s.start && s.end);
     if (valid.length === 0) return "出勤・退勤の時刻を入力してください。";

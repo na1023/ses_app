@@ -87,6 +87,7 @@ export default async function SettlementPage({
                   {data.overtime.toFixed(1)}
                   <span className="metric-unit">h</span>
                 </div>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.overtime)}）</div>
               </div>
               <div className="metric">
                 <div className="metric-label">就業時間超過（定時超）</div>
@@ -94,6 +95,7 @@ export default async function SettlementPage({
                   {data.scheduleOver.toFixed(1)}
                   <span className="metric-unit">h</span>
                 </div>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.scheduleOver)}）</div>
               </div>
             </div>
             <p className="mt-1.5 text-xs" style={{ color: "var(--subtle)" }}>
@@ -207,13 +209,13 @@ export default async function SettlementPage({
                         <span style={{ color: "var(--subtle)" }}>
                           残業(8h超){" "}
                           <b style={{ color: r.overtime > 0 ? "#f59e0b" : "var(--muted)" }}>
-                            {r.overtime.toFixed(1)}h
+                            {r.overtime.toFixed(1)}h{r.overtime > 0 ? `（${hm(r.overtime)}）` : ""}
                           </b>
                         </span>
                         <span style={{ color: "var(--subtle)" }}>
                           就業超過{" "}
                           <b style={{ color: r.scheduleOver > 0 ? "#6366f1" : "var(--muted)" }}>
-                            {r.scheduled !== null ? `${r.scheduleOver.toFixed(1)}h` : "—"}
+                            {r.scheduled !== null ? `${r.scheduleOver.toFixed(1)}h${r.scheduleOver > 0 ? `（${hm(r.scheduleOver)}）` : ""}` : "—"}
                           </b>
                         </span>
                       </div>

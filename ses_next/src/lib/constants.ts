@@ -140,6 +140,14 @@ export const WORK_TYPES = new Set([
 
 export const LATE_EARLY_TYPES = new Set(["遅刻", "早退", "遅刻+早退"]);
 
+// 半休（半日は勤務・半日は有給消化）。時刻入力を出す。
+export const HALF_WORK_TYPES = new Set(["午前半休", "午後半休"]);
+
+/** 稼働時間として集計する区分（通常勤務＋半休）。 */
+export function countsAsWork(att: string): boolean {
+  return WORK_TYPES.has(att) || HALF_WORK_TYPES.has(att);
+}
+
 export const ATT_COLOR: Record<string, string> = {
   出社: "#3b82f6",
   在宅: "#6366f1",

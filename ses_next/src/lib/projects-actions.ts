@@ -5,7 +5,7 @@ import { createClient } from "./supabase/server";
 import {
   Project,
   DailyReport,
-  WORK_TYPES,
+  countsAsWork,
   parseNum,
   effectiveStatus,
   scheduledHours,
@@ -157,7 +157,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     elapsed = Math.min(1, (today.getDate()) / daysInMonth);
 
   const monthDaily = daily.filter(
-    (d) => String(d.date).startsWith(ym) && WORK_TYPES.has(d.attendance_type)
+    (d) => String(d.date).startsWith(ym) && countsAsWork(d.attendance_type)
   );
 
   const schedByProject = new Map<string, number | null>();
@@ -181,7 +181,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   // 年間残業累計（当年1月〜当月まで）
   let annualOvertime = 0;
   daily.forEach((d) => {
-    if (!WORK_TYPES.has(d.attendance_type)) return;
+    if (!countsAsWork(d.attendance_type)) return;
     const ds = String(d.date);
     if (ds.slice(0, 4) !== String(yy)) return;
     if (ds.slice(0, 7) > ym) return; // 当月より後は除外
