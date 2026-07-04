@@ -193,8 +193,11 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   projects.forEach((p) => {
     const est = effectiveStatus(p.status, p.end_date);
     const end = parseDate(p.end_date);
+    const startD = parseDate(p.start_date);
     // 当月開始より前に終了した案件は、この月以降 表示しない
     if (end && end < monthStart) return;
+    // 当月末より後に開始する案件（＝開始前の月）は表示しない
+    if (startD && startD > monthEnd) return;
 
     // 終了案件は終了日以降の日を含めない
     const days = monthDaily.filter(

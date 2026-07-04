@@ -10,6 +10,7 @@ import {
   scheduledHours,
 } from "@/lib/constants";
 import { saveProject, deleteProject } from "@/lib/projects-actions";
+import TimeInput from "@/components/TimeInput";
 
 const EMPTY = {
   id: "",
@@ -308,30 +309,15 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                 <div className="grid grid-cols-3 gap-3">
                   <div>
                     <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>開始</div>
-                    <input
-                      type="time"
-                      className="field"
-                      value={form.work_start}
-                      onChange={(e) => setForm({ ...form, work_start: e.target.value })}
-                    />
+                    <TimeInput value={form.work_start} onChange={(v) => setForm({ ...form, work_start: v })} placeholder="08:50" />
                   </div>
                   <div>
                     <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>終了</div>
-                    <input
-                      type="time"
-                      className="field"
-                      value={form.work_end}
-                      onChange={(e) => setForm({ ...form, work_end: e.target.value })}
-                    />
+                    <TimeInput value={form.work_end} onChange={(v) => setForm({ ...form, work_end: v })} placeholder="17:10" />
                   </div>
                   <div>
                     <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>休憩</div>
-                    <input
-                      type="time"
-                      className="field"
-                      value={form.work_break}
-                      onChange={(e) => setForm({ ...form, work_break: e.target.value })}
-                    />
+                    <TimeInput value={form.work_break} onChange={(v) => setForm({ ...form, work_break: v })} placeholder="01:00" />
                   </div>
                 </div>
                 <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 const ITEMS = [
   { href: "/", label: "日報", icon: "📝" },
@@ -12,7 +13,29 @@ const ITEMS = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [kb, setKb] = useState(false);
+
+  // 入力（キーボード）表示中はフッターを隠して被りを防ぐ
+  useEffect(() => {
+    const onIn = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) {
+        const type = (t as HTMLInputElement).type;
+        if (type !== "checkbox" && type !== "radio" && type !== "date") setKb(true);
+      }
+    };
+    const onOut = () => setKb(false);
+    document.addEventListener("focusin", onIn);
+    document.addEventListener("focusout", onOut);
+    return () => {
+      document.removeEventListener("focusin", onIn);
+      document.removeEventListener("focusout", onOut);
+    };
+  }, []);
+
   if (pathname.startsWith("/login")) return null;
+  if (kb) return null;
+
   return (
     <nav
       className="fixed bottom-0 left-1/2 z-50 w-full max-w-xl -translate-x-1/2 border-t"

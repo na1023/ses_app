@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/actions";
 import { getSettlement, SettlementResult } from "@/lib/projects-actions";
+import { hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "./MonthNav";
 
@@ -71,6 +72,7 @@ export default async function SettlementPage({
                   {data.totalWorked.toFixed(1)}
                   <span className="metric-unit">h</span>
                 </div>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.totalWorked)}）</div>
               </div>
               <div className="metric">
                 <div className="metric-label">勤務日数</div>
@@ -150,8 +152,7 @@ export default async function SettlementPage({
                             {r.worked.toFixed(1)}
                           </span>
                           <span className="text-sm" style={{ color: "var(--muted)" }}>
-                            {" "}
-                            h 稼働
+                            {" "}h（{hm(r.worked)}）稼働
                           </span>
                         </div>
                         <div className="text-right text-xs" style={{ color: "var(--subtle)" }}>

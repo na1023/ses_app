@@ -10,10 +10,47 @@ export type DailyReport = {
   work_hours: number | string;
   late_early_time: string;
   return_office_hours: string;
+  work_sessions: string; // 複数勤務セッションの JSON: [{start,end}]
   work_content: string;
   remarks: string;
   created_at: string;
 };
+
+export type WorkSession = { start: string; end: string };
+
+/** 小数時間を「8時間30分」形式にする */
+export function hm(h: number): string {
+  const total = Math.round(h * 60);
+  const hh = Math.floor(total / 60);
+  const mm = total % 60;
+  return mm === 0 ? `${hh}時間` : `${hh}時間${mm}分`;
+}
+
+/** 小数時間を「8.5（8時間30分）」形式にする */
+export function hoursLabel(h: number): string {
+  return `${h.toFixed(2)}（${hm(h)}）`;
+}
+
+/** セッション配列から実働合計(h)を計算 */
+export function sessionsHours(sessions: WorkSession[]): number {
+  return sessions.reduce((s, seg) => {
+    const a = hhmmToMin(seg.start);
+    const b = hhmmToMin(seg.end);
+    if (a == null || b == null || b <= a) return s;
+    return s + (b - a) / 60;
+  }, 0);
+}
+
+/** work_sessions(JSON文字列) をパース。失敗なら空配列 */
+export function parseSessions(json: string): WorkSession[] {
+  try {
+    const v = JSON.parse(json || "[]");
+    if (Array.isArray(v)) return v.filter((x) => x && x.start && x.end);
+  } catch {
+    /* ignore */
+  }
+  return [];
+}
 
 export type Project = {
   id: string;
