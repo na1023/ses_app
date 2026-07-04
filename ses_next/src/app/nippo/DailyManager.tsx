@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   ATTENDANCE_OPTIONS,
   ATT_COLOR,
@@ -17,15 +16,15 @@ import {
 } from "@/lib/constants";
 import { createDaily, updateDaily, deleteDaily, DailyInput } from "@/lib/actions";
 import TimeInput from "@/components/TimeInput";
+import Calendar from "@/components/Calendar";
 
 function todayStr() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
-// 指定日に参画中か（開始<=日付<=終了、終了は現在/空なら継続）
+// 指定日に参画期間内か（開始<=日付<=終了）。終了案件でも、その日が参画期間内なら表示する。
 function activeOn(p: Project, date: string): boolean {
-  if (p.status === "終了") return false;
   const s = (p.start_date || "").trim();
   const e = (p.end_date || "").trim();
   if (s && date < s) return false;
@@ -85,17 +84,26 @@ function fromReport(r: DailyReport): FormState {
 export default function DailyManager({
   projects,
   reports,
+  holidays,
 }: {
   projects: Project[];
   reports: DailyReport[];
+  holidays: Record<string, string>;
 }) {
-  const router = useRouter();
+  const [list, setList] = useState<DailyReport[]>(reports);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [edit, setEdit] = useState<FormState | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
 
-  const existingDates = useMemo(() => new Set(reports.map((r) => r.date)), [reports]);
+  const existingDates = useMemo(() => new Set(list.map((r) => r.date)), [list]);
+  const reportedMap = useMemo(() => {
+    const m: Record<string, string> = {};
+    list.forEach((r) => { m[r.date] = r.attendance_type; });
+    return m;
+  }, [list]);
+
+  const sortByDate = (a: DailyReport[]) => [...a].sort((x, y) => (x.date < y.date ? 1 : -1));
 
   function toInput(f: FormState): DailyInput {
     const officeH = f.isReturn ? calcWorkHours(f.returnStart, f.returnEnd, "00:00") : 0;
@@ -118,9 +126,9 @@ export default function DailyManager({
     start(async () => {
       const res = await createDaily(toInput(form));
       setMsg({ ok: res.ok, text: res.message });
-      if (res.ok) {
+      if (res.ok && res.row) {
+        setList((prev) => sortByDate([res.row!, ...prev.filter((r) => r.id !== res.row!.id)]));
         setForm({ ...emptyForm(), date: form.date });
-        router.refresh();
       }
     });
   }
@@ -128,22 +136,27 @@ export default function DailyManager({
     if (!edit?.id) return;
     start(async () => {
       const res = await updateDaily(edit.id!, toInput(edit));
-      if (res.ok) {
+      if (res.ok && res.row) {
+        setList((prev) => sortByDate(prev.map((r) => (r.id === res.row!.id ? res.row! : r))));
         setEdit(null);
-        router.refresh();
       } else alert(res.message);
     });
   }
   function remove(id: string) {
     if (!confirm("この日報を削除しますか？")) return;
+    setList((prev) => prev.filter((r) => r.id !== id)); // 楽観的に即時反映
     start(async () => {
       await deleteDaily(id);
-      router.refresh();
     });
   }
 
   return (
     <>
+      <Calendar
+        reported={reportedMap}
+        holidays={holidays}
+        onPick={(d) => setForm((p) => ({ ...p, date: d }))}
+      />
       <Fields
         f={form}
         setF={setForm}
@@ -162,11 +175,11 @@ export default function DailyManager({
       {/* 直近の日報 */}
       <section className="mt-7">
         <h2 className="mb-2 text-sm font-bold" style={{ color: "var(--muted)" }}>直近の日報</h2>
-        {reports.length === 0 ? (
+        {list.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--subtle)" }}>まだ登録がありません。</p>
         ) : (
           <ul className="space-y-2">
-            {reports.map((r) => {
+            {list.map((r) => {
               const wh = Number(r.work_hours) || 0;
               const color = ATT_COLOR[r.attendance_type] ?? "#94a3b8";
               return (

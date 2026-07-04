@@ -114,7 +114,7 @@ function validate(input: DailyInput): string | null {
 /** 日報を登録 */
 export async function createDaily(
   input: DailyInput
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; row?: DailyReport }> {
   const sb = createClient();
   const {
     data: { user },
@@ -125,19 +125,23 @@ export async function createDaily(
   if (err) return { ok: false, message: err };
 
   const { _wh, ...row } = buildRow(input, user.id);
-  const { error } = await sb.from("daily_reports").insert({ id: genId(), created_at: new Date().toISOString().slice(0, 16).replace("T", " "), ...row });
+  const { data, error } = await sb
+    .from("daily_reports")
+    .insert({ id: genId(), created_at: new Date().toISOString().slice(0, 16).replace("T", " "), ...row })
+    .select()
+    .single();
   if (error) return { ok: false, message: `保存に失敗しました: ${error.message}` };
 
   revalidatePath("/");
   const extra = _wh > 0 ? `（実働 ${_wh.toFixed(2)}h）` : "";
-  return { ok: true, message: `${input.date} の日報を登録しました${extra}` };
+  return { ok: true, message: `${input.date} の日報を登録しました${extra}`, row: data as DailyReport };
 }
 
 /** 日報を更新 */
 export async function updateDaily(
   id: string,
   input: DailyInput
-): Promise<{ ok: boolean; message: string }> {
+): Promise<{ ok: boolean; message: string; row?: DailyReport }> {
   const sb = createClient();
   const {
     data: { user },
@@ -149,11 +153,16 @@ export async function updateDaily(
 
   const { _wh: _u, ...row } = buildRow(input, user.id);
   void _u;
-  const { error } = await sb.from("daily_reports").update(row).eq("id", id);
+  const { data, error } = await sb
+    .from("daily_reports")
+    .update(row)
+    .eq("id", id)
+    .select()
+    .single();
   if (error) return { ok: false, message: `更新に失敗しました: ${error.message}` };
 
   revalidatePath("/");
-  return { ok: true, message: "日報を更新しました" };
+  return { ok: true, message: "日報を更新しました", row: data as DailyReport };
 }
 
 /** 日報を削除 */

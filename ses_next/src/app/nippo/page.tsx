@@ -6,13 +6,30 @@ import AppHeader from "@/components/AppHeader";
 
 export const dynamic = "force-dynamic";
 
+async function getHolidays(): Promise<Record<string, string>> {
+  try {
+    const res = await fetch("https://holidays-jp.github.io/api/v1/date.json", {
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return {};
+    return (await res.json()) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
 export default async function NippoPage() {
   let reports: Awaited<ReturnType<typeof listRecentDaily>> = [];
   let projects: Project[] = [];
+  let holidays: Record<string, string> = {};
   let loadError = "";
   const user = await getCurrentUser();
   try {
-    [reports, projects] = await Promise.all([listRecentDaily(60), listProjects()]);
+    [reports, projects, holidays] = await Promise.all([
+      listRecentDaily(60),
+      listProjects(),
+      getHolidays(),
+    ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
   }
@@ -26,7 +43,7 @@ export default async function NippoPage() {
             データ接続エラー: {loadError}
           </div>
         ) : (
-          <DailyManager projects={projects} reports={reports} />
+          <DailyManager projects={projects} reports={reports} holidays={holidays} />
         )}
       </div>
     </div>
