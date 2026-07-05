@@ -9,6 +9,8 @@ import {
   parseNum,
   effectiveStatus,
   scheduledHours,
+  projectWorkDays,
+  worksOnHolidays,
   OVERTIME_BASE_HOURS,
 } from "./constants";
 
@@ -39,6 +41,8 @@ export type ProjectInput = {
   work_start: string;
   work_end: string;
   work_break: string;
+  work_days: string;
+  work_holidays: string;
   memo: string;
 };
 
@@ -66,6 +70,8 @@ export async function saveProject(
     work_start: input.work_start,
     work_end: input.work_end,
     work_break: input.work_break,
+    work_days: input.work_days,
+    work_holidays: input.work_holidays,
     memo: input.memo,
     user_id: user.id,
   };
@@ -171,26 +177,9 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
 
   const monthComplete = today > monthEnd;
 
-  // 営業日（土日祝を除く）ベースで経過割合を算出（ペース見込みの精度向上）
+  // 日付→YYYY-MM-DD（祝日判定・稼働日計算に使用）
   const ymdStr = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const isBusinessDay = (d: Date) => {
-    const w = d.getDay();
-    if (w === 0 || w === 6) return false;
-    return !holidays.has(ymdStr(d));
-  };
-  let totalBiz = 0;
-  let elapsedBiz = 0;
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dt = new Date(yy, mm - 1, day);
-    if (isBusinessDay(dt)) {
-      totalBiz++;
-      if (dt <= today) elapsedBiz++;
-    }
-  }
-  let elapsed = 1;
-  if (today < monthStart) elapsed = 0;
-  else if (!monthComplete) elapsed = totalBiz > 0 ? Math.min(1, elapsedBiz / totalBiz) : 0;
 
   const monthDaily = daily.filter(
     (d) => String(d.date).startsWith(ym) && countsAsWork(d.attendance_type)
@@ -261,7 +250,23 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     else if (max !== null && worked > max) { excess = worked - max; state = "over"; }
     else if (min !== null || max !== null) state = "ok";
 
-    // 現在ペースの月末見込み
+    // 現在ペースの月末見込み（案件ごとの稼働曜日・祝日設定で経過割合を算出）
+    const wdset = projectWorkDays(p);
+    const holWork = worksOnHolidays(p);
+    let pTot = 0;
+    let pEl = 0;
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dt = new Date(yy, mm - 1, day);
+      if (end && dt > end) break; // 終了日以降は数えない
+      const wd = dt.getDay();
+      const isWorkday = wdset.has(wd) && (holWork || !holidays.has(ymdStr(dt)));
+      if (isWorkday) {
+        pTot++;
+        if (dt <= today) pEl++;
+      }
+    }
+    const projElapsed = monthComplete ? 1 : today < monthStart ? 0 : pTot > 0 ? Math.min(1, pEl / pTot) : 0;
+
     const projectComplete = monthComplete || (end !== null && end <= today);
     let projected: number | null = null;
     let pace: SettlementRow["pace"] = "none";
@@ -269,8 +274,8 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       if (projectComplete) {
         projected = worked;
         pace = "done";
-      } else if (elapsed > 0) {
-        projected = worked / elapsed;
+      } else if (projElapsed > 0) {
+        projected = worked / projElapsed;
         if (max !== null && projected > max) pace = "overpace";
         else if (min !== null && projected < min) pace = "behind";
         else pace = "ontrack";

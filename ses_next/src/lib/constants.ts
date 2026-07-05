@@ -65,8 +65,26 @@ export type Project = {
   work_start: string;
   work_end: string;
   work_break: string;
+  work_days: string; // 稼働曜日 "0,1..6"（0=日）既定=平日
+  work_holidays: string; // 祝日も稼働 '1'/'0'
   memo: string;
 };
+
+/** 案件の稼働曜日セット（未設定は平日 月〜金） */
+export function projectWorkDays(p: { work_days?: string }): Set<number> {
+  const raw = (p.work_days || "").trim();
+  if (!raw) return new Set([1, 2, 3, 4, 5]);
+  const s = new Set<number>();
+  raw.split(",").forEach((x) => {
+    const n = parseInt(x, 10);
+    if (!Number.isNaN(n) && n >= 0 && n <= 6) s.add(n);
+  });
+  return s.size ? s : new Set([1, 2, 3, 4, 5]);
+}
+
+export function worksOnHolidays(p: { work_holidays?: string }): boolean {
+  return p.work_holidays === "1";
+}
 
 export const PROJECT_STATUSES = ["参画前", "参画中", "終了"] as const;
 

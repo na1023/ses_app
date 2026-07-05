@@ -49,6 +49,8 @@ alter table projects       add column if not exists standard_hours text default 
 alter table projects       add column if not exists work_start text default '';
 alter table projects       add column if not exists work_end   text default '';
 alter table projects       add column if not exists work_break text default '01:00';
+alter table projects       add column if not exists work_days text default '1,2,3,4,5';
+alter table projects       add column if not exists work_holidays text default '0';
 alter table daily_reports  add column if not exists late_early_time text default '0';
 alter table daily_reports  add column if not exists return_office_hours text default '0';
 alter table daily_reports  add column if not exists work_sessions text default '';

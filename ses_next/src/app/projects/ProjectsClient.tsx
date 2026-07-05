@@ -25,8 +25,12 @@ const EMPTY = {
   work_start: "",
   work_end: "",
   work_break: "01:00",
+  work_days: "1,2,3,4,5",
+  work_holidays: "0",
   memo: "",
 };
+
+const DOW_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
 export default function ProjectsClient({ projects }: { projects: Project[] }) {
   const router = useRouter();
@@ -57,6 +61,8 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
       work_start: p.work_start || "",
       work_end: p.work_end || "",
       work_break: p.work_break || "01:00",
+      work_days: p.work_days || "1,2,3,4,5",
+      work_holidays: p.work_holidays || "0",
       memo: p.memo || "",
     });
     setMsg(null);
@@ -327,6 +333,47 @@ export default function ProjectsClient({ projects }: { projects: Project[] }) {
                       ? `定時 ${s.toFixed(2)}h／日。残業は8h超、就業時間超過はこの定時超で算出します。`
                       : "例 8:50〜17:10・休憩1:00。設定すると就業時間超過を算出します。";
                   })()}
+                </p>
+              </div>
+
+              <div>
+                <label className="label">稼働曜日（この現場に出勤する曜日）</label>
+                <div className="flex gap-1.5">
+                  {DOW_LABELS.map((lbl, idx) => {
+                    const set = new Set(
+                      (form.work_days || "").split(",").map((x) => parseInt(x, 10)).filter((n) => !Number.isNaN(n))
+                    );
+                    const on = set.has(idx);
+                    const color = idx === 0 ? "#f87171" : idx === 6 ? "#60a5fa" : "#3b82f6";
+                    return (
+                      <button
+                        key={idx}
+                        className="chip"
+                        data-active={on}
+                        style={on ? { background: color } : undefined}
+                        onClick={() => {
+                          if (on) set.delete(idx);
+                          else set.add(idx);
+                          const arr = Array.from(set).sort((a, b) => a - b);
+                          setForm({ ...form, work_days: arr.join(",") });
+                        }}
+                      >
+                        {lbl}
+                      </button>
+                    );
+                  })}
+                </div>
+                <label className="mt-2 flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-5 w-5"
+                    checked={form.work_holidays === "1"}
+                    onChange={(e) => setForm({ ...form, work_holidays: e.target.checked ? "1" : "0" })}
+                  />
+                  祝日も稼働する現場
+                </label>
+                <p className="mt-1 text-xs" style={{ color: "var(--subtle)" }}>
+                  精算の「現在ペース・月末見込み」計算に使います（既定は平日のみ）。
                 </p>
               </div>
 
