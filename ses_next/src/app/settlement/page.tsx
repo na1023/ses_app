@@ -69,7 +69,7 @@ export default async function SettlementPage({
               <div className="metric">
                 <div className="metric-label">総勤務時間</div>
                 <div className="metric-value">
-                  {data.totalWorked.toFixed(1)}
+                  {data.totalWorked.toFixed(2)}
                   <span className="metric-unit">h</span>
                 </div>
                 <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.totalWorked)}）</div>
@@ -84,7 +84,7 @@ export default async function SettlementPage({
               <div className="metric">
                 <div className="metric-label">残業（8h超）</div>
                 <div className="metric-value" style={{ color: data.overtime > 0 ? "#f59e0b" : undefined }}>
-                  {data.overtime.toFixed(1)}
+                  {data.overtime.toFixed(2)}
                   <span className="metric-unit">h</span>
                 </div>
                 <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.overtime)}）</div>
@@ -92,7 +92,7 @@ export default async function SettlementPage({
               <div className="metric">
                 <div className="metric-label">就業時間超過（定時超）</div>
                 <div className="metric-value" style={{ color: data.scheduleOver > 0 ? "#6366f1" : undefined }}>
-                  {data.scheduleOver.toFixed(1)}
+                  {data.scheduleOver.toFixed(2)}
                   <span className="metric-unit">h</span>
                 </div>
                 <div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(data.scheduleOver)}）</div>
@@ -151,7 +151,7 @@ export default async function SettlementPage({
                       <div className="mt-2 flex items-end justify-between">
                         <div>
                           <span className="text-2xl font-extrabold">
-                            {r.worked.toFixed(1)}
+                            {r.worked.toFixed(2)}
                           </span>
                           <span className="text-sm" style={{ color: "var(--muted)" }}>
                             {" "}h（{hm(r.worked)}）稼働
@@ -172,9 +172,9 @@ export default async function SettlementPage({
                           </div>
                           <div className="mt-1.5 text-sm font-semibold" style={{ color: meta.color }}>
                             {r.state === "short"
-                              ? `下限まで あと ${r.shortage.toFixed(1)} h 不足`
+                              ? `下限まで あと ${r.shortage.toFixed(2)} h 不足`
                               : r.state === "over"
-                              ? `上限を ${r.excess.toFixed(1)} h 超過`
+                              ? `上限を ${r.excess.toFixed(2)} h 超過`
                               : "精算幅の範囲内（適正）"}
                           </div>
                           {/* 現在ペース（月途中のみ） */}
@@ -209,13 +209,13 @@ export default async function SettlementPage({
                         <span style={{ color: "var(--subtle)" }}>
                           残業(8h超){" "}
                           <b style={{ color: r.overtime > 0 ? "#f59e0b" : "var(--muted)" }}>
-                            {r.overtime.toFixed(1)}h{r.overtime > 0 ? `（${hm(r.overtime)}）` : ""}
+                            {r.overtime.toFixed(2)}h{r.overtime > 0 ? `（${hm(r.overtime)}）` : ""}
                           </b>
                         </span>
                         <span style={{ color: "var(--subtle)" }}>
                           就業超過{" "}
                           <b style={{ color: r.scheduleOver > 0 ? "#6366f1" : "var(--muted)" }}>
-                            {r.scheduled !== null ? `${r.scheduleOver.toFixed(1)}h${r.scheduleOver > 0 ? `（${hm(r.scheduleOver)}）` : ""}` : "—"}
+                            {r.scheduled !== null ? `${r.scheduleOver.toFixed(2)}h${r.scheduleOver > 0 ? `（${hm(r.scheduleOver)}）` : ""}` : "—"}
                           </b>
                         </span>
                       </div>

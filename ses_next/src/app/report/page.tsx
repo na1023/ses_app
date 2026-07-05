@@ -56,10 +56,10 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
         ) : (
           <>
             <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="metric"><div className="metric-label">総勤務時間</div><div className="metric-value">{total.toFixed(1)}<span className="metric-unit">h</span></div></div>
+              <div className="metric"><div className="metric-label">総勤務時間</div><div className="metric-value">{total.toFixed(2)}<span className="metric-unit">h</span></div></div>
               <div className="metric"><div className="metric-label">勤務日数</div><div className="metric-value">{workDays}<span className="metric-unit">日</span></div></div>
-              <div className="metric"><div className="metric-label">1日平均</div><div className="metric-value">{avg.toFixed(1)}<span className="metric-unit">h</span></div></div>
-              <div className="metric"><div className="metric-label">うち帰社</div><div className="metric-value">{officeHours.toFixed(1)}<span className="metric-unit">h</span></div></div>
+              <div className="metric"><div className="metric-label">1日平均</div><div className="metric-value">{avg.toFixed(2)}<span className="metric-unit">h</span></div></div>
+              <div className="metric"><div className="metric-label">うち帰社</div><div className="metric-value">{officeHours.toFixed(2)}<span className="metric-unit">h</span></div></div>
             </div>
 
             <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>勤怠区分別</h2>
@@ -87,7 +87,7 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
                     <div key={k}>
                       <div className="mb-1 flex items-center justify-between text-sm">
                         <span className="truncate pr-2">{k}</span>
-                        <span className="shrink-0 font-bold">{v.toFixed(1)}h</span>
+                        <span className="shrink-0 font-bold">{v.toFixed(2)}h</span>
                       </div>
                       <div className="bar-track">
                         <div className="bar-fill" style={{ width: `${(v / maxProj) * 100}%`, background: "#3b82f6" }} />
