@@ -37,6 +37,9 @@ create table if not exists salary_records (
 create table if not exists leave_grants (
   id text primary key, grant_date text default '', days text default '0', memo text default '', created_at text default ''
 );
+create table if not exists settlement_notes (
+  id text primary key, project_id text default '', year_month text default '', reason text default '', created_at text default ''
+);
 
 -- ---------- 追加列（v2〜v5） ----------
 alter table projects       add column if not exists status text default '参画前';
@@ -60,6 +63,7 @@ alter table interviews      add column if not exists user_id uuid references aut
 alter table todos           add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table salary_records  add column if not exists user_id uuid references auth.users(id) on delete cascade;
 alter table leave_grants    add column if not exists user_id uuid references auth.users(id) on delete cascade;
+alter table settlement_notes add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
 alter table daily_reports   enable row level security;
 alter table projects        enable row level security;
@@ -67,11 +71,12 @@ alter table interviews      enable row level security;
 alter table todos           enable row level security;
 alter table salary_records  enable row level security;
 alter table leave_grants    enable row level security;
+alter table settlement_notes enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['daily_reports','projects','interviews','todos','salary_records','leave_grants']
+  foreach t in array array['daily_reports','projects','interviews','todos','salary_records','leave_grants','settlement_notes']
   loop
     execute format('drop policy if exists "own_select" on %I;', t);
     execute format('drop policy if exists "own_insert" on %I;', t);

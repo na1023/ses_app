@@ -3,6 +3,7 @@ import { getSettlement, SettlementResult } from "@/lib/projects-actions";
 import { hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "./MonthNav";
+import ReasonEditor from "./ReasonEditor";
 
 export const dynamic = "force-dynamic";
 
@@ -190,6 +191,15 @@ export default async function SettlementPage({
                                 </div>
                               );
                             })()
+                          ) : null}
+                          {/* 下限割れ/上限超過の理由メモ */}
+                          {r.state === "short" || r.state === "over" ? (
+                            <ReasonEditor
+                              projectId={r.project_id}
+                              ym={data.ym}
+                              initial={r.reason}
+                              kind={r.state}
+                            />
                           ) : null}
                         </>
                       ) : (

@@ -110,6 +110,7 @@ export type SettlementRow = {
   scheduleOver: number; // 就業時間超過（定時超）当該案件分
   projected: number | null; // 月末見込み稼働（現在ペース）
   pace: "ontrack" | "behind" | "overpace" | "done" | "none"; // 現在ペース判定
+  reason: string; // 下限割れ/上限超過などの理由メモ
 };
 
 export type LawWarning = { level: "danger" | "warn" | "info"; text: string };
@@ -135,12 +136,17 @@ function parseDate(s: string): Date | null {
 
 export async function getSettlement(ym: string): Promise<SettlementResult> {
   const sb = createClient();
-  const [{ data: projData }, { data: dailyData }] = await Promise.all([
+  const [{ data: projData }, { data: dailyData }, { data: noteData }] = await Promise.all([
     sb.from("projects").select("*"),
     sb.from("daily_reports").select("*"),
+    sb.from("settlement_notes").select("project_id, reason").eq("year_month", ym),
   ]);
   const projects = (projData ?? []) as Project[];
   const daily = (dailyData ?? []) as DailyReport[];
+  const noteMap = new Map<string, string>();
+  (noteData ?? []).forEach((n: { project_id?: string; reason?: string }) => {
+    if (n.project_id) noteMap.set(n.project_id, n.reason ?? "");
+  });
 
   const [yy, mm] = ym.split("-").map(Number);
   const monthStart = new Date(yy, mm - 1, 1);
@@ -245,7 +251,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       project_id: p.id, company: p.company, project_name: p.project_name,
       status: est, worked, min, max, shortage, excess, state,
       scheduled: sched, overtime: projOt, scheduleOver: projSched,
-      projected, pace,
+      projected, pace, reason: noteMap.get(p.id) ?? "",
     });
   });
 
@@ -289,4 +295,30 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     warnings.push({ level: "warn", text: `${maxRun}日連続勤務があります。労基法は週1日以上の休日を求めています。` });
 
   return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings };
+}
+
+/** 精算の理由メモを保存（月×案件ごと） */
+export async function saveSettlementNote(
+  projectId: string,
+  ym: string,
+  reason: string
+): Promise<{ ok: boolean; message: string }> {
+  const sb = createClient();
+  const {
+    data: { user },
+  } = await sb.auth.getUser();
+  if (!user) return { ok: false, message: "ログインが必要です。" };
+
+  const { error } = await sb.from("settlement_notes").upsert({
+    id: `${projectId}_${ym}`,
+    project_id: projectId,
+    year_month: ym,
+    reason: reason.trim(),
+    user_id: user.id,
+    created_at: new Date().toISOString().slice(0, 16).replace("T", " "),
+  });
+  if (error) return { ok: false, message: `保存に失敗: ${error.message}` };
+
+  revalidatePath("/settlement");
+  return { ok: true, message: "理由を保存しました" };
 }
