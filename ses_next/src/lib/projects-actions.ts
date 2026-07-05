@@ -134,12 +134,26 @@ function parseDate(s: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+async function getHolidaySet(): Promise<Set<string>> {
+  try {
+    const res = await fetch("https://holidays-jp.github.io/api/v1/date.json", {
+      next: { revalidate: 86400 },
+    });
+    if (!res.ok) return new Set();
+    const j = (await res.json()) as Record<string, string>;
+    return new Set(Object.keys(j));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function getSettlement(ym: string): Promise<SettlementResult> {
   const sb = createClient();
-  const [{ data: projData }, { data: dailyData }, { data: noteData }] = await Promise.all([
+  const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays] = await Promise.all([
     sb.from("projects").select("*"),
     sb.from("daily_reports").select("*"),
     sb.from("settlement_notes").select("project_id, reason").eq("year_month", ym),
+    getHolidaySet(),
   ]);
   const projects = (projData ?? []) as Project[];
   const daily = (dailyData ?? []) as DailyReport[];
@@ -156,11 +170,27 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   today.setHours(0, 0, 0, 0);
 
   const monthComplete = today > monthEnd;
-  // 経過割合（当月内で今日までに経過した日数の割合）
+
+  // 営業日（土日祝を除く）ベースで経過割合を算出（ペース見込みの精度向上）
+  const ymdStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const isBusinessDay = (d: Date) => {
+    const w = d.getDay();
+    if (w === 0 || w === 6) return false;
+    return !holidays.has(ymdStr(d));
+  };
+  let totalBiz = 0;
+  let elapsedBiz = 0;
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dt = new Date(yy, mm - 1, day);
+    if (isBusinessDay(dt)) {
+      totalBiz++;
+      if (dt <= today) elapsedBiz++;
+    }
+  }
   let elapsed = 1;
   if (today < monthStart) elapsed = 0;
-  else if (!monthComplete)
-    elapsed = Math.min(1, (today.getDate()) / daysInMonth);
+  else if (!monthComplete) elapsed = totalBiz > 0 ? Math.min(1, elapsedBiz / totalBiz) : 0;
 
   const monthDaily = daily.filter(
     (d) => String(d.date).startsWith(ym) && countsAsWork(d.attendance_type)
