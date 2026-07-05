@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import BottomNav from "@/components/BottomNav";
+import PWARegister from "@/components/PWARegister";
 
 export const metadata: Metadata = {
   title: "SES業務管理",
@@ -31,6 +32,7 @@ export default function RootLayout({
           {children}
         </main>
         <BottomNav />
+        <PWARegister />
       </body>
     </html>
   );

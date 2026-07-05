@@ -99,6 +99,8 @@ export default function DailyManager({
   const [edit, setEdit] = useState<FormState | null>(null);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
+  const [fYm, setFYm] = useState(""); // 月フィルタ（""=全て）
+  const [q, setQ] = useState(""); // 検索
 
   const existingDates = useMemo(() => new Set(list.map((r) => r.date)), [list]);
   const reportedMap = useMemo(() => {
@@ -106,6 +108,25 @@ export default function DailyManager({
     list.forEach((r) => { m[r.date] = r.attendance_type; });
     return m;
   }, [list]);
+
+  const filtered = useMemo(() => {
+    const kw = q.trim().toLowerCase();
+    return list.filter((r) => {
+      if (fYm && !r.date.startsWith(fYm)) return false;
+      if (kw) {
+        const hay = `${r.company} ${r.project_name} ${r.attendance_type} ${r.work_content} ${r.remarks}`.toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
+    });
+  }, [list, fYm, q]);
+
+  // カレンダーの日タップ：その日に日報があれば編集、無ければ新規の日付にセット
+  function pickDate(d: string) {
+    const found = list.find((r) => r.date === d);
+    if (found) setEdit(fromReport(found));
+    else setForm((p) => ({ ...p, date: d }));
+  }
 
   const sortByDate = (a: DailyReport[]) => [...a].sort((x, y) => (x.date < y.date ? 1 : -1));
 
@@ -160,7 +181,7 @@ export default function DailyManager({
       <Calendar
         reported={reportedMap}
         holidays={holidays}
-        onPick={(d) => setForm((p) => ({ ...p, date: d }))}
+        onPick={pickDate}
       />
       <Fields
         f={form}
@@ -177,14 +198,23 @@ export default function DailyManager({
         {busy ? "登録中…" : "日報を登録する"}
       </button>
 
-      {/* 直近の日報 */}
+      {/* 日報一覧 */}
       <section className="mt-7">
-        <h2 className="mb-2 text-sm font-bold" style={{ color: "var(--muted)" }}>直近の日報</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-bold" style={{ color: "var(--muted)" }}>日報一覧</h2>
+          <span className="text-xs" style={{ color: "var(--subtle)" }}>{filtered.length} / {list.length} 件</span>
+        </div>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <input type="month" className="field" value={fYm} onChange={(e) => setFYm(e.target.value)} />
+          <input type="text" className="field" value={q} onChange={(e) => setQ(e.target.value)} placeholder="会社・案件・内容で検索" />
+        </div>
         {list.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--subtle)" }}>まだ登録がありません。</p>
+        ) : filtered.length === 0 ? (
+          <p className="text-sm" style={{ color: "var(--subtle)" }}>該当する日報がありません。</p>
         ) : (
           <ul className="space-y-2">
-            {list.map((r) => {
+            {filtered.map((r) => {
               const wh = Number(r.work_hours) || 0;
               const color = ATT_COLOR[r.attendance_type] ?? "#94a3b8";
               return (
