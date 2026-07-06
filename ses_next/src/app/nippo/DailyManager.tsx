@@ -324,7 +324,24 @@ function Fields({
             </div>
             <div>
               <label className="label">案件名</label>
-              <select className="field" value={f.project} onChange={(e) => set({ project: e.target.value })}>
+              <select
+                className="field"
+                value={f.project}
+                onChange={(e) => {
+                  const proj = e.target.value;
+                  const matched = active.find((p) => p.company === f.company && p.project_name === proj);
+                  // 案件に就業時間が設定されていれば、勤務時間・休憩を自動入力
+                  if (matched && matched.work_start && matched.work_end) {
+                    set({
+                      project: proj,
+                      sessions: [{ start: matched.work_start, end: matched.work_end }],
+                      breakTime: matched.work_break || "00:00",
+                    });
+                  } else {
+                    set({ project: proj });
+                  }
+                }}
+              >
                 <option value="">選択</option>
                 {projOptions.map((p) => <option key={p} value={p}>{p}</option>)}
                 {f.project && !projOptions.includes(f.project) ? <option value={f.project}>{f.project}</option> : null}

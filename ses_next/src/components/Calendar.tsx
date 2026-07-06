@@ -37,8 +37,12 @@ export default function Calendar({
     setView({ y: nd.getFullYear(), m: nd.getMonth() });
   }
 
-  // 記入済み日数 / 平日
-  const filledCount = Object.keys(reported).filter((k) => k.startsWith(`${view.y}-${String(view.m + 1).padStart(2, "0")}`)).length;
+  // 記入済み日数 / この月に出現した勤怠区分
+  const monthPrefix = `${view.y}-${String(view.m + 1).padStart(2, "0")}`;
+  const filledCount = Object.keys(reported).filter((k) => k.startsWith(monthPrefix)).length;
+  const presentTypes = Array.from(
+    new Set(Object.entries(reported).filter(([k]) => k.startsWith(monthPrefix)).map(([, v]) => v))
+  ).filter(Boolean);
 
   return (
     <div className="mb-4">
@@ -73,33 +77,48 @@ export default function Calendar({
               const dow = new Date(view.y, view.m, d).getDay();
               const isToday = ds === todayStr;
               const dateColor = hol || dow === 0 ? "#f87171" : dow === 6 ? "#60a5fa" : "var(--text)";
+              const attColor = att ? ATT_COLOR[att] ?? "#3b82f6" : "";
               return (
                 <button
                   key={idx}
                   onClick={() => onPick?.(ds)}
-                  className="flex flex-col items-center rounded-lg py-1.5"
+                  className="flex min-h-[3rem] flex-col items-center justify-start rounded-lg py-1"
                   style={{
-                    background: att ? (ATT_COLOR[att] ?? "#3b82f6") + "22" : "transparent",
-                    border: isToday ? "1px solid var(--accent)" : "1px solid transparent",
+                    background: att ? attColor + "2e" : "transparent",
+                    border: isToday ? "1px solid var(--accent)" : att ? `1px solid ${attColor}66` : "1px solid transparent",
                   }}
                   title={hol ?? ""}
                 >
                   <span className="text-sm" style={{ color: dateColor, fontWeight: isToday ? 700 : 400 }}>{d}</span>
                   {att ? (
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full" style={{ background: ATT_COLOR[att] ?? "#3b82f6" }} />
-                  ) : (
-                    <span className="mt-0.5 h-1.5 w-1.5 rounded-full" style={{ background: "transparent", border: "1px solid var(--border)" }} />
-                  )}
+                    <span
+                      className="mt-0.5 rounded px-1 text-[9px] font-bold leading-tight"
+                      style={{ background: attColor, color: "#0e1016" }}
+                    >
+                      {att.length > 3 ? att.slice(0, 3) : att}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
           </div>
 
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs" style={{ color: "var(--subtle)" }}>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full" style={{ background: "#3b82f6" }} />記入済み</span>
-            <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full border" style={{ borderColor: "var(--border)" }} />未記入</span>
-            <span style={{ color: "#f87171" }}>■ 日曜・祝日</span>
-          </div>
+          {/* 凡例：この月に出現した勤怠区分の色分け */}
+          {presentTypes.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1.5 text-xs" style={{ color: "var(--muted)" }}>
+              {presentTypes.map((t) => (
+                <span key={t} className="flex items-center gap-1">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: ATT_COLOR[t] ?? "#64748b" }} />
+                  {t}
+                </span>
+              ))}
+              <span className="flex items-center gap-1" style={{ color: "var(--subtle)" }}>
+                <span className="h-2.5 w-2.5 rounded-full border" style={{ borderColor: "var(--border)" }} />未記入
+              </span>
+            </div>
+          ) : (
+            <div className="mt-3 text-xs" style={{ color: "var(--subtle)" }}>この月の記入はまだありません。</div>
+          )}
         </div>
       ) : null}
     </div>
