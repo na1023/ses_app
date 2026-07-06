@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 const ITEMS = [
-  { href: "/", label: "日報", icon: "📝" },
+  { href: "/", label: "ホーム", icon: "🏠" },
+  { href: "/nippo", label: "日報", icon: "📝" },
   { href: "/projects", label: "案件", icon: "📁" },
   { href: "/settlement", label: "精算", icon: "📊" },
   { href: "/more", label: "その他", icon: "⋯" },

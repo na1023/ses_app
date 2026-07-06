@@ -7,6 +7,7 @@ import {
   LATE_EARLY_TYPES,
   countsAsWork,
   hhmmToMin,
+  dayWorkLevel,
   Project,
   DailyReport,
   WorkSession,
@@ -194,9 +195,24 @@ export default function DailyManager({
           {msg.text}
         </div>
       ) : null}
-      <button className="btn-primary mt-3" disabled={busy} onClick={submitCreate}>
-        {busy ? "登録中…" : "日報を登録する"}
-      </button>
+      <div className="mt-3 flex gap-2">
+        <button className="btn-primary" disabled={busy} onClick={submitCreate}>
+          {busy ? "登録中…" : "日報を登録する"}
+        </button>
+        {list.length > 0 ? (
+          <button
+            className="btn-ghost shrink-0"
+            title="直近の日報の会社・案件・時間をコピー"
+            onClick={() => {
+              const src = list[0];
+              const base = fromReport(src);
+              setForm({ ...base, id: undefined, date: form.date });
+            }}
+          >
+            直近をコピー
+          </button>
+        ) : null}
+      </div>
 
       {/* 日報一覧 */}
       <section className="mt-7">
@@ -216,14 +232,19 @@ export default function DailyManager({
           <ul className="space-y-2">
             {filtered.map((r) => {
               const wh = Number(r.work_hours) || 0;
+              const dayTotal = wh + (parseFloat(r.return_office_hours || "0") || 0);
               const color = ATT_COLOR[r.attendance_type] ?? "#94a3b8";
+              const lv = dayWorkLevel(dayTotal);
               return (
                 <li key={r.id} className="card">
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold">{r.date}</span>
                         <span className="badge" style={{ background: color + "22", color }}>{r.attendance_type}</span>
+                        {dayTotal > 0 ? (
+                          <span className="badge" style={{ background: lv.color + "22", color: lv.color }}>{lv.emoji} {lv.label}</span>
+                        ) : null}
                       </div>
                       <div className="mt-0.5 text-xs" style={{ color: "var(--subtle)" }}>
                         {[r.company && `${r.company}${r.project_name ? " / " + r.project_name : ""}`, wh > 0 && `実働 ${hoursLabel(wh)}h`].filter(Boolean).join("  |  ")}

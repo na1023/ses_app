@@ -41,6 +41,30 @@ export function sessionsHours(sessions: WorkSession[]): number {
   }, 0);
 }
 
+// ============================================================
+// 働き方レベル（その日／その月のワークバランス判定）
+// ============================================================
+export type WorkLevel = { key: string; label: string; color: string; emoji: string };
+
+/** その日の勤務時間(h)からレベル判定 */
+export function dayWorkLevel(hours: number): WorkLevel {
+  if (hours <= 0) return { key: "none", label: "休み", color: "#64748b", emoji: "" };
+  if (hours < 5) return { key: "light", label: "軽め", color: "#60a5fa", emoji: "🌱" };
+  if (hours <= 9) return { key: "good", label: "良好", color: "#10b981", emoji: "☀️" };
+  if (hours <= 11) return { key: "slight", label: "やや多い", color: "#f59e0b", emoji: "⚠️" };
+  if (hours <= 13) return { key: "over", label: "働きすぎ", color: "#f97316", emoji: "🔥" };
+  return { key: "danger", label: "危険", color: "#ef4444", emoji: "🚨" };
+}
+
+/** その月のレベル判定（残業h＋最大連続勤務日数） */
+export function monthWorkLevel(overtime: number, maxConsecutive: number): WorkLevel {
+  if (overtime >= 80 || maxConsecutive >= 12) return { key: "danger", label: "過労レベル", color: "#ef4444", emoji: "🚨" };
+  if (overtime >= 60 || maxConsecutive >= 10) return { key: "over", label: "働きすぎ", color: "#f97316", emoji: "🔥" };
+  if (overtime >= 45 || maxConsecutive >= 8) return { key: "slight", label: "やや働きすぎ", color: "#f59e0b", emoji: "⚠️" };
+  if (overtime >= 20) return { key: "normal", label: "普通", color: "#3b82f6", emoji: "🙂" };
+  return { key: "good", label: "良好", color: "#10b981", emoji: "☀️" };
+}
+
 /** work_sessions(JSON文字列) をパース。失敗なら空配列 */
 export function parseSessions(json: string): WorkSession[] {
   try {
