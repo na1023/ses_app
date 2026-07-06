@@ -17,6 +17,22 @@
   --red: #ef4444;
 }
 
+/* ライトテーマ */
+html[data-theme="light"] {
+  --bg: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #eef2f8;
+  --border: #d7e0ee;
+  --text: #0f1720;
+  --muted: #475569;
+  --subtle: #7c8aa0;
+}
+
+/* 文字サイズ */
+html { font-size: 16px; }
+html[data-font="large"] { font-size: 18px; }
+html[data-font="xlarge"] { font-size: 20px; }
+
 html,
 body {
   background: var(--bg);
@@ -38,15 +54,14 @@ body {
   position: sticky;
   top: 0;
   z-index: 30;
-  background: linear-gradient(180deg, rgba(14, 16, 22, 0.96), rgba(14, 16, 22, 0.82));
-  backdrop-filter: blur(8px);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
 /* ===== 入力 ===== */
 .field {
   width: 100%;
-  background: #0f1420;
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 0.8rem 0.9rem;
@@ -194,7 +209,7 @@ body {
 /* ===== 進捗バー ===== */
 .bar-track {
   height: 8px;
-  background: #0f1420;
+  background: var(--surface-2);
   border-radius: 999px;
   overflow: hidden;
   border: 1px solid var(--border);

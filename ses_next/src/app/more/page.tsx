@@ -10,6 +10,8 @@ const READY = [
   { href: "/leave", label: "有給休暇", note: "残日数・付与" },
   { href: "/report", label: "レポート", note: "月次集計" },
   { href: "/career", label: "職務経歴生成", note: "経歴の自動作成" },
+  { href: "/diagnostics", label: "エラー自動検出", note: "データ整合チェック" },
+  { href: "/settings", label: "設定", note: "テーマ・文字サイズ・PW" },
 ];
 const SOON: { label: string; note: string }[] = [];
 
