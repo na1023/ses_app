@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/actions";
 import { listAllDaily } from "@/lib/domain-actions";
-import { DailyReport, countsAsWork, ATT_COLOR, parseNum, hm } from "@/lib/constants";
+import { DailyReport, countsAsWork, ATT_COLOR, parseNum } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "../settlement/MonthNav";
 
@@ -45,25 +45,6 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
   const projList = Array.from(projMap.entries()).sort((a, b) => b[1] - a[1]);
   const maxProj = projList.length ? projList[0][1] : 1;
 
-  // 週別集計（月曜始まり）
-  const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const mdLabel = (s: string) => { const [, m, dd] = s.split("-"); return `${Number(m)}/${Number(dd)}`; };
-  type Wk = { start: string; hours: number; ot: number; days: Set<string> };
-  const weekMap = new Map<string, Wk>();
-  workRows.forEach((d) => {
-    const dt = new Date(d.date);
-    const monday = new Date(dt);
-    monday.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); // 月曜へ
-    const key = ymd(monday);
-    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
-    const w = weekMap.get(key) ?? { start: key, hours: 0, ot: 0, days: new Set<string>() };
-    w.hours += dayTotal;
-    if (dayTotal > 8) w.ot += dayTotal - 8;
-    w.days.add(d.date);
-    weekMap.set(key, w);
-  });
-  const weeks = Array.from(weekMap.values()).sort((a, b) => (a.start < b.start ? -1 : 1));
-
   return (
     <div>
       <AppHeader title="レポート" subtitle="月次の稼働サマリー" email={user?.email} />
@@ -80,34 +61,6 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
               <div className="metric"><div className="metric-label">1日平均</div><div className="metric-value">{avg.toFixed(2)}<span className="metric-unit">h</span></div></div>
               <div className="metric"><div className="metric-label">うち帰社</div><div className="metric-value">{officeHours.toFixed(2)}<span className="metric-unit">h</span></div></div>
             </div>
-
-            {/* 週別 */}
-            <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>週別（勤務・残業）</h2>
-            {weeks.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--subtle)" }}>この月のデータはありません。</p>
-            ) : (
-              <div className="card space-y-3">
-                {weeks.map((w) => {
-                  const sunday = new Date(w.start);
-                  sunday.setDate(sunday.getDate() + 6);
-                  const maxH = Math.max(...weeks.map((x) => x.hours), 1);
-                  return (
-                    <div key={w.start}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="font-semibold">{mdLabel(w.start)}〜{mdLabel(ymd(sunday))}</span>
-                        <span style={{ color: "var(--muted)" }}>
-                          {w.hours.toFixed(2)}h（{hm(w.hours)}）・{w.days.size}日
-                          {w.ot > 0 ? <span style={{ color: "#f59e0b" }}> ・残業{w.ot.toFixed(2)}h</span> : null}
-                        </span>
-                      </div>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(w.hours / maxH) * 100}%`, background: w.ot > 0 ? "#f59e0b" : "#3b82f6" }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
 
             <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>勤怠区分別</h2>
             {attList.length === 0 ? (

@@ -103,6 +103,33 @@ export default async function SettlementPage({
               残業＝各日(現場＋帰社)が8hを超えた分。就業時間超過＝案件の定時を超えた分。
             </p>
 
+            {/* 週別（勤務・残業） */}
+            <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>週別（勤務・残業）</h2>
+            {data.weeks.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--subtle)" }}>この月のデータはありません。</p>
+            ) : (
+              <div className="card space-y-3">
+                {(() => {
+                  const maxH = Math.max(...data.weeks.map((w) => w.hours), 1);
+                  const md = (s: string) => { const [, m, dd] = s.split("-"); return `${Number(m)}/${Number(dd)}`; };
+                  return data.weeks.map((w) => (
+                    <div key={w.start}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="font-semibold">{md(w.start)}〜{md(w.end)}</span>
+                        <span style={{ color: "var(--muted)" }}>
+                          {w.hours.toFixed(2)}h（{hm(w.hours)}）・{w.days}日
+                          {w.ot > 0 ? <span style={{ color: "#f59e0b" }}> ・残業{w.ot.toFixed(2)}h</span> : null}
+                        </span>
+                      </div>
+                      <div className="bar-track">
+                        <div className="bar-fill" style={{ width: `${(w.hours / maxH) * 100}%`, background: w.ot > 0 ? "#f59e0b" : "#3b82f6" }} />
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            )}
+
             {/* 案件ごとの精算 */}
             <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>
               案件ごとの精算状況

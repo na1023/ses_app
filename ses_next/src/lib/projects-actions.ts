@@ -121,6 +121,8 @@ export type SettlementRow = {
 
 export type LawWarning = { level: "danger" | "warn" | "info"; text: string };
 
+export type WeekSummary = { start: string; end: string; hours: number; ot: number; days: number };
+
 export type SettlementResult = {
   ym: string;
   rows: SettlementRow[];
@@ -131,6 +133,7 @@ export type SettlementResult = {
   annualOvertime: number; // 当年の残業累計（1〜当月）
   monthComplete: boolean; // 当月がすでに終了しているか
   warnings: LawWarning[];
+  weeks: WeekSummary[]; // 週別（月曜始まり）
 };
 
 function parseDate(s: string): Date | null {
@@ -329,7 +332,29 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   if (maxRun >= 7)
     warnings.push({ level: "warn", text: `${maxRun}日連続勤務があります。労基法は週1日以上の休日を求めています。` });
 
-  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings };
+  // ===== 週別集計（月曜始まり） =====
+  const weekMap = new Map<string, { start: string; hours: number; ot: number; days: Set<string> }>();
+  monthDaily.forEach((d) => {
+    const dt = new Date(d.date);
+    const monday = new Date(dt);
+    monday.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
+    const key = ymdStr(monday);
+    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
+    const w = weekMap.get(key) ?? { start: key, hours: 0, ot: 0, days: new Set<string>() };
+    w.hours += dayTotal;
+    if (dayTotal > OVERTIME_BASE_HOURS) w.ot += dayTotal - OVERTIME_BASE_HOURS;
+    w.days.add(d.date);
+    weekMap.set(key, w);
+  });
+  const weeks: WeekSummary[] = Array.from(weekMap.values())
+    .sort((a, b) => (a.start < b.start ? -1 : 1))
+    .map((w) => {
+      const sun = new Date(w.start);
+      sun.setDate(sun.getDate() + 6);
+      return { start: w.start, end: ymdStr(sun), hours: w.hours, ot: w.ot, days: w.days.size };
+    });
+
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks };
 }
 
 /** 精算の理由メモを保存（月×案件ごと） */
