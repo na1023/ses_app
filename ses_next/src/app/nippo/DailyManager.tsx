@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
   ATTENDANCE_OPTIONS,
   ATT_COLOR,
@@ -23,6 +23,25 @@ import Calendar from "@/components/Calendar";
 function todayStr() {
   const d = new Date();
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+// ===== オフライン入力キュー（localStorage） =====
+type QueuedItem = { tempId: string; input: DailyInput };
+const QKEY = "ses_daily_queue";
+function loadQueue(): QueuedItem[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(QKEY) || "[]");
+    return Array.isArray(v) ? v : [];
+  } catch {
+    return [];
+  }
+}
+function saveQueue(q: QueuedItem[]) {
+  try {
+    localStorage.setItem(QKEY, JSON.stringify(q));
+  } catch {
+    /* ignore */
+  }
 }
 
 // 指定日に参画期間内か（開始<=日付<=終了）。終了案件でも、その日が参画期間内なら表示する。
@@ -102,6 +121,66 @@ export default function DailyManager({
   const [busy, start] = useTransition();
   const [fYm, setFYm] = useState(""); // 月フィルタ（""=全て）
   const [q, setQ] = useState(""); // 検索
+  const [queue, setQueue] = useState<QueuedItem[]>([]);
+  const [online, setOnline] = useState(true);
+
+  const sortByDate = useCallback(
+    (a: DailyReport[]) => [...a].sort((x, y) => (x.date < y.date ? 1 : -1)),
+    []
+  );
+
+  // 未同期キューをサーバーへ送信
+  const flush = useCallback(async () => {
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    let q0 = loadQueue();
+    for (const item of q0) {
+      try {
+        const res = await createDaily(item.input);
+        if (res.ok && res.row) {
+          const row = res.row;
+          setList((prev) => sortByDate([row, ...prev.filter((r) => r.id !== row.id)]));
+          q0 = q0.filter((x) => x.tempId !== item.tempId);
+          saveQueue(q0);
+        } else {
+          // バリデーションエラー等（通信は成功）→ キューから除去
+          q0 = q0.filter((x) => x.tempId !== item.tempId);
+          saveQueue(q0);
+        }
+      } catch {
+        break; // まだ通信不可
+      }
+    }
+    setQueue(loadQueue());
+  }, [sortByDate]);
+
+  useEffect(() => {
+    setQueue(loadQueue());
+    setOnline(navigator.onLine);
+    const up = () => { setOnline(true); flush(); };
+    const down = () => setOnline(false);
+    window.addEventListener("online", up);
+    window.addEventListener("offline", down);
+    if (navigator.onLine) flush();
+    return () => {
+      window.removeEventListener("online", up);
+      window.removeEventListener("offline", down);
+    };
+  }, [flush]);
+
+  function enqueue(input: DailyInput) {
+    const item: QueuedItem = {
+      tempId: "q" + Date.now() + Math.random().toString(36).slice(2, 6),
+      input,
+    };
+    const next = [...loadQueue(), item];
+    saveQueue(next);
+    setQueue(next);
+  }
+  function dropQueued(tempId: string) {
+    const next = loadQueue().filter((x) => x.tempId !== tempId);
+    saveQueue(next);
+    setQueue(next);
+  }
 
   const existingDates = useMemo(() => new Set(list.map((r) => r.date)), [list]);
   const reportedMap = useMemo(() => {
@@ -129,8 +208,6 @@ export default function DailyManager({
     else setForm((p) => ({ ...p, date: d }));
   }
 
-  const sortByDate = (a: DailyReport[]) => [...a].sort((x, y) => (x.date < y.date ? 1 : -1));
-
   function toInput(f: FormState): DailyInput {
     const officeH = f.isReturn ? calcWorkHours(f.returnStart, f.returnEnd, "00:00") : 0;
     return {
@@ -150,12 +227,28 @@ export default function DailyManager({
 
   function submitCreate() {
     setMsg(null);
+    const input = toInput(form);
+    // オフライン時はキューへ
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      enqueue(input);
+      setForm({ ...emptyForm(), date: form.date });
+      setMsg({ ok: true, text: "オフラインのため未同期で保存しました。復帰時に自動送信します。" });
+      return;
+    }
     start(async () => {
-      const res = await createDaily(toInput(form));
-      setMsg({ ok: res.ok, text: res.message });
-      if (res.ok && res.row) {
-        setList((prev) => sortByDate([res.row!, ...prev.filter((r) => r.id !== res.row!.id)]));
+      try {
+        const res = await createDaily(input);
+        setMsg({ ok: res.ok, text: res.message });
+        if (res.ok && res.row) {
+          const row = res.row;
+          setList((prev) => sortByDate([row, ...prev.filter((r) => r.id !== row.id)]));
+          setForm({ ...emptyForm(), date: form.date });
+        }
+      } catch {
+        // 通信失敗 → キューへ退避
+        enqueue(input);
         setForm({ ...emptyForm(), date: form.date });
+        setMsg({ ok: true, text: "通信できないため未同期で保存しました。復帰時に自動送信します。" });
       }
     });
   }
@@ -179,6 +272,12 @@ export default function DailyManager({
 
   return (
     <>
+      {!online ? (
+        <div className="mb-3 rounded-xl px-3 py-2 text-sm" style={{ background: "#3a2a06", color: "#fbbf24" }}>
+          📡 オフラインです。日報は端末に保存され、オンライン復帰時に自動で送信されます。
+        </div>
+      ) : null}
+
       <Calendar
         reported={reportedMap}
         holidays={holidays}
@@ -213,6 +312,39 @@ export default function DailyManager({
           </button>
         ) : null}
       </div>
+
+      {/* 未同期キュー */}
+      {queue.length > 0 ? (
+        <section className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <h2 className="text-sm font-bold" style={{ color: "#fbbf24" }}>未同期 {queue.length}件</h2>
+            <button className="btn-ghost" onClick={() => flush()}>今すぐ同期</button>
+          </div>
+          <ul className="space-y-2">
+            {queue.map((item) => {
+              const inp = item.input;
+              const h = sessionsHours((inp.sessions || []).filter((s) => s.start && s.end));
+              return (
+                <li key={item.tempId} className="card" style={{ borderColor: "#78500f" }}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold">{inp.date}</span>
+                        <span className="badge" style={{ background: "#3a2a06", color: "#fbbf24" }}>未同期</span>
+                        <span className="text-xs" style={{ color: "var(--subtle)" }}>{inp.attendance_type}</span>
+                      </div>
+                      <div className="mt-0.5 text-xs" style={{ color: "var(--subtle)" }}>
+                        {[inp.company && `${inp.company}${inp.project_name ? " / " + inp.project_name : ""}`, h > 0 && `実働 ${h.toFixed(2)}h`].filter(Boolean).join("  |  ")}
+                      </div>
+                    </div>
+                    <button className="btn-ghost shrink-0" style={{ color: "var(--red)" }} onClick={() => dropQueued(item.tempId)}>取消</button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
 
       {/* 日報一覧 */}
       <section className="mt-7">
