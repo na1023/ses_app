@@ -4,6 +4,7 @@ import { hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "./MonthNav";
 import ReasonEditor from "./ReasonEditor";
+import ShareButton, { ShareData } from "./ShareButton";
 
 export const dynamic = "force-dynamic";
 
@@ -50,12 +51,38 @@ export default async function SettlementPage({
     loadError = e instanceof Error ? e.message : String(e);
   }
 
+  const shareData: ShareData | null = data
+    ? {
+        periodLabel: data.periodLabel,
+        totalWorked: data.totalWorked,
+        workDays: data.workDays,
+        overtime: data.overtime,
+        scheduleOver: data.scheduleOver,
+        hourly: data.hourly,
+        pay: { inner: data.pay.innerPay, outer: data.pay.outerPay, night: data.pay.nightPay, total: data.pay.total },
+        weeks: data.weeks.map((w) => ({ start: w.start, end: w.end, hours: w.hours, ot: w.ot, days: w.days })),
+        rows: data.rows.map((r) => ({
+          company: r.company,
+          project: r.project_name,
+          worked: r.worked,
+          min: r.min,
+          max: r.max,
+          state: STATE_META[r.state]?.label ?? "—",
+        })),
+      }
+    : null;
+
   return (
     <div>
       <AppHeader title="精算・稼働" subtitle="案件ごとの過不足と月間稼働" email={user?.email} />
 
       <div className="px-4 pt-4">
-        <MonthNav ym={ym} />
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1">
+            <MonthNav ym={ym} />
+          </div>
+          {shareData ? <ShareButton data={shareData} /> : null}
+        </div>
         {data ? (
           <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
         ) : null}

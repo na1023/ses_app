@@ -203,35 +203,46 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     schedByProject.set(`${p.company}||${p.project_name}`, scheduledHours(p))
   );
 
+  // すべて「分」で集計して端数(1分ズレ)を防ぐ
+  const toMin = (h: number) => Math.round(h * 60);
+  const LEGAL_MIN = OVERTIME_BASE_HOURS * 60; // 480
+
   // 月間集計（実績）＋ 残業代
-  let totalWorked = 0;
-  let overtime = 0;
-  let scheduleOver = 0;
+  let totalMin = 0;
+  let overtimeMin = 0;
+  let scheduleOverMin = 0;
   let pay: PayTotals = emptyTotals();
   monthDaily.forEach((d) => {
-    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
-    totalWorked += dayTotal;
-    if (dayTotal > OVERTIME_BASE_HOURS) overtime += dayTotal - OVERTIME_BASE_HOURS;
+    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    totalMin += dayMin;
+    if (dayMin > LEGAL_MIN) overtimeMin += dayMin - LEGAL_MIN;
     const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;
-    if (sched !== null && dayTotal > sched) scheduleOver += dayTotal - sched;
+    if (sched !== null) {
+      const schedMin = toMin(sched);
+      if (dayMin > schedMin) scheduleOverMin += dayMin - schedMin;
+    }
     // 残業代（自社定時＝所定として法定内/法定外/深夜を1分単位で算出）
     const sess = parseSessions(d.work_sessions);
     if (sess.length && wage > 0) {
       pay = addDayToTotals(pay, computeDayPay(sess, d.break_time || "", stdMin, wage));
     }
   });
+  const totalWorked = totalMin / 60;
+  const overtime = overtimeMin / 60;
+  const scheduleOver = scheduleOverMin / 60;
   const workDays = new Set(monthDaily.map((d) => d.date)).size;
 
-  // 年間残業累計（当年1月〜当月まで）
-  let annualOvertime = 0;
+  // 年間残業累計（当年1月〜当月まで・分で集計）
+  let annualOtMin = 0;
   daily.forEach((d) => {
     if (!countsAsWork(d.attendance_type)) return;
     const ds = String(d.date);
     if (ds.slice(0, 4) !== String(yy)) return;
     if (ds.slice(0, 7) > ym) return; // 当月より後は除外
-    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
-    if (dayTotal > OVERTIME_BASE_HOURS) annualOvertime += dayTotal - OVERTIME_BASE_HOURS;
+    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    if (dayMin > LEGAL_MIN) annualOtMin += dayMin - LEGAL_MIN;
   });
+  const annualOvertime = annualOtMin / 60;
 
   const rows: SettlementRow[] = [];
   projects.forEach((p) => {
@@ -250,15 +261,18 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
         d.project_name === p.project_name &&
         (!end || new Date(d.date) <= end)
     );
-    const worked = days.reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
+    const worked = days.reduce((s, d) => s + toMin(Number(d.work_hours) || 0), 0) / 60;
     const sched = scheduledHours(p);
-    let projOt = 0;
-    let projSched = 0;
+    const schedMinP = sched !== null ? toMin(sched) : null;
+    let projOtMin = 0;
+    let projSchedMin = 0;
     days.forEach((d) => {
-      const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
-      if (dayTotal > OVERTIME_BASE_HOURS) projOt += dayTotal - OVERTIME_BASE_HOURS;
-      if (sched !== null && dayTotal > sched) projSched += dayTotal - sched;
+      const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+      if (dayMin > LEGAL_MIN) projOtMin += dayMin - LEGAL_MIN;
+      if (schedMinP !== null && dayMin > schedMinP) projSchedMin += dayMin - schedMinP;
     });
+    const projOt = projOtMin / 60;
+    const projSched = projSchedMin / 60;
 
     const min = parseNum(p.min_hours);
     const max = parseNum(p.max_hours);
@@ -347,17 +361,17 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   if (maxRun >= 7)
     warnings.push({ level: "warn", text: `${maxRun}日連続勤務があります。労基法は週1日以上の休日を求めています。` });
 
-  // ===== 週別集計（月曜始まり） =====
-  const weekMap = new Map<string, { start: string; hours: number; ot: number; days: Set<string> }>();
+  // ===== 週別集計（月曜始まり・分で集計） =====
+  const weekMap = new Map<string, { start: string; hoursMin: number; otMin: number; days: Set<string> }>();
   monthDaily.forEach((d) => {
     const dt = new Date(d.date);
     const monday = new Date(dt);
     monday.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
     const key = ymdStr(monday);
-    const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
-    const w = weekMap.get(key) ?? { start: key, hours: 0, ot: 0, days: new Set<string>() };
-    w.hours += dayTotal;
-    if (dayTotal > OVERTIME_BASE_HOURS) w.ot += dayTotal - OVERTIME_BASE_HOURS;
+    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    const w = weekMap.get(key) ?? { start: key, hoursMin: 0, otMin: 0, days: new Set<string>() };
+    w.hoursMin += dayMin;
+    if (dayMin > LEGAL_MIN) w.otMin += dayMin - LEGAL_MIN;
     w.days.add(d.date);
     weekMap.set(key, w);
   });
@@ -366,7 +380,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     .map((w) => {
       const sun = new Date(w.start);
       sun.setDate(sun.getDate() + 6);
-      return { start: w.start, end: ymdStr(sun), hours: w.hours, ot: w.ot, days: w.days.size };
+      return { start: w.start, end: ymdStr(sun), hours: w.hoursMin / 60, ot: w.otMin / 60, days: w.days.size };
     });
 
   return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage };

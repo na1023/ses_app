@@ -72,8 +72,9 @@ function buildRow(input: DailyInput, userId: string) {
   const needsTime = countsAsWork(input.attendance_type);
   const validSessions = (input.sessions || []).filter((s) => s.start && s.end);
   const breakH = (hhmmToMin(input.break_time || "") ?? 0) / 60;
+  // 分単位の精度で保存（小数第2位に丸めると合算時に1分ズレるため min/60 で保持）
   const wh = needsTime
-    ? Math.max(0, Math.round((sessionsHours(validSessions) - breakH) * 100) / 100)
+    ? Math.max(0, Math.round((sessionsHours(validSessions) - breakH) * 60) / 60)
     : 0;
   const lateEarly =
     LATE_EARLY_TYPES.has(input.attendance_type) && input.late_early_time

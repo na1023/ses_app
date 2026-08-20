@@ -219,7 +219,7 @@ export default function DailyManager({
       sessions: f.sessions,
       break_time: f.breakTime,
       late_early_time: LATE_EARLY_TYPES.has(f.att) ? f.lateEarly : "0",
-      return_office_hours: f.isReturn ? String(Math.round(officeH * 100) / 100) : "0",
+      return_office_hours: f.isReturn ? String(Math.round(officeH * 60) / 60) : "0",
       work_content: f.content,
       remarks: f.remarks,
     };
