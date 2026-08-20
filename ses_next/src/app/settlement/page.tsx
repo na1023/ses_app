@@ -12,6 +12,21 @@ function currentYm(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function Row({ label, min, yen, color }: { label: string; min: number; yen: number; color?: string }) {
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  const t = min > 0 ? (m === 0 ? `${h}時間` : `${h}時間${m}分`) : "0";
+  return (
+    <div className="flex items-center justify-between">
+      <span style={{ color: "var(--muted)" }}>{label}</span>
+      <span>
+        <span style={{ color: "var(--subtle)" }}>{t}</span>{" "}
+        <b style={{ color: color ?? "var(--text)" }}>¥{Math.round(yen).toLocaleString()}</b>
+      </span>
+    </div>
+  );
+}
+
 const STATE_META: Record<string, { label: string; color: string }> = {
   ok: { label: "適正", color: "#10b981" },
   short: { label: "不足", color: "#ef4444" },
@@ -41,6 +56,9 @@ export default async function SettlementPage({
 
       <div className="px-4 pt-4">
         <MonthNav ym={ym} />
+        {data ? (
+          <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
+        ) : null}
 
         {loadError ? (
           <div className="mt-4 card text-sm" style={{ color: "#f87171" }}>
@@ -127,6 +145,32 @@ export default async function SettlementPage({
                     </div>
                   ));
                 })()}
+              </div>
+            )}
+
+            {/* 残業代（自社定時基準・1分単位） */}
+            {data.hourly > 0 ? (
+              <>
+                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（概算）</h2>
+                <div className="card">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm" style={{ color: "var(--subtle)" }}>時給（月平均所定より）</span>
+                    <span className="font-bold">¥{Math.round(data.hourly).toLocaleString()}/h</span>
+                  </div>
+                  <div className="mt-2 space-y-1 border-t pt-2 text-sm" style={{ borderColor: "var(--border)" }}>
+                    <Row label="法定内残業（100%）" min={data.pay.innerOtMin} yen={data.pay.innerPay} />
+                    <Row label="法定外残業（125%）" min={data.pay.outerOtMin} yen={data.pay.outerPay} color="#f59e0b" />
+                    <Row label="深夜割増（+25%）" min={data.pay.nightMin} yen={data.pay.nightPay} color="#6366f1" />
+                    <div className="flex items-center justify-between border-t pt-1.5 font-bold" style={{ borderColor: "var(--border)" }}>
+                      <span>残業代合計</span>
+                      <span style={{ color: "#10b981" }}>¥{Math.round(data.pay.total).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="mt-6 card text-xs" style={{ color: "var(--subtle)" }}>
+                残業代を計算するには「設定」で自社の定時・月額基本給・年間所定労働日数を入力してください。
               </div>
             )}
 

@@ -40,6 +40,15 @@ create table if not exists leave_grants (
 create table if not exists settlement_notes (
   id text primary key, project_id text default '', year_month text default '', reason text default '', created_at text default ''
 );
+create table if not exists user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  closing_type text default 'month_end', standard_minutes text default '480',
+  annual_work_days text default '240', base_salary text default '0',
+  fixed_allowance text default '0', updated_at text default ''
+);
+alter table user_settings enable row level security;
+drop policy if exists "own_all" on user_settings;
+create policy "own_all" on user_settings using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ---------- 追加列（v2〜v5） ----------
 alter table projects       add column if not exists status text default '参画前';

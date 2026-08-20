@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 const READY = [
   { href: "/salary", label: "給与管理", note: "月収・手取り" },
-  { href: "/interviews", label: "面談・ToDo管理", note: "選考・タスク" },
+  { href: "/interviews", label: "面談管理", note: "選考の記録" },
   { href: "/leave", label: "有給休暇", note: "残日数・付与" },
   { href: "/report", label: "レポート", note: "月次集計" },
   { href: "/career", label: "職務経歴生成", note: "経歴の自動作成" },

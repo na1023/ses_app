@@ -107,62 +107,6 @@ export async function deleteInterview(id: string) {
 }
 
 // ============================================================
-// ToDo
-// ============================================================
-export type Todo = {
-  id: string;
-  company: string;
-  project_name: string;
-  task: string;
-  due_date: string;
-  progress: string;
-  created_at: string;
-};
-
-export async function listTodos(): Promise<Todo[]> {
-  const { sb } = await sbUser();
-  const { data, error } = await sb
-    .from("todos")
-    .select("*")
-    .order("due_date", { ascending: true });
-  if (error) throw new Error(error.message);
-  return (data ?? []) as Todo[];
-}
-
-export async function saveTodo(rec: Partial<Todo> & { id?: string }) {
-  const { sb, user } = await sbUser();
-  if (!user) return { ok: false, message: "ログインが必要です。" };
-  if (!rec.task?.trim()) return { ok: false, message: "タスク内容を入力してください。" };
-  const row = { ...rec, user_id: user.id };
-  delete (row as { id?: string }).id;
-  if (rec.id) {
-    const { error } = await sb.from("todos").update(row).eq("id", rec.id);
-    if (error) return { ok: false, message: error.message };
-  } else {
-    const { error } = await sb
-      .from("todos")
-      .insert({ id: genId(), created_at: new Date().toISOString().slice(0, 16).replace("T", " "), ...row });
-    if (error) return { ok: false, message: error.message };
-  }
-  revalidatePath("/interviews");
-  return { ok: true, message: rec.id ? "更新しました" : "登録しました" };
-}
-
-export async function setTodoProgress(id: string, progress: string) {
-  const { sb } = await sbUser();
-  await sb.from("todos").update({ progress }).eq("id", id);
-  revalidatePath("/interviews");
-  return { ok: true };
-}
-
-export async function deleteTodo(id: string) {
-  const { sb } = await sbUser();
-  await sb.from("todos").delete().eq("id", id);
-  revalidatePath("/interviews");
-  return { ok: true };
-}
-
-// ============================================================
 // 有給付与
 // ============================================================
 export type LeaveGrant = {

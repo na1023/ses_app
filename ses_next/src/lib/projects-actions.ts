@@ -11,8 +11,13 @@ import {
   scheduledHours,
   projectWorkDays,
   worksOnHolidays,
+  parseSessions,
   OVERTIME_BASE_HOURS,
 } from "./constants";
+import { getSettings } from "./settings-actions";
+import { hourlyWage } from "./settings";
+import { periodOf, inPeriod, ymdOf } from "./period";
+import { computeDayPay, emptyTotals, addDayToTotals, PayTotals } from "./payroll";
 
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -134,6 +139,9 @@ export type SettlementResult = {
   monthComplete: boolean; // 当月がすでに終了しているか
   warnings: LawWarning[];
   weeks: WeekSummary[]; // 週別（月曜始まり）
+  periodLabel: string; // 集計期間の表示（締め日対応）
+  pay: PayTotals; // 残業代（法定内/法定外/深夜）
+  hourly: number; // 時給（円/時）
 };
 
 function parseDate(s: string): Date | null {
@@ -158,11 +166,12 @@ async function getHolidaySet(): Promise<Set<string>> {
 
 export async function getSettlement(ym: string): Promise<SettlementResult> {
   const sb = createClient();
-  const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays] = await Promise.all([
+  const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays, settings] = await Promise.all([
     sb.from("projects").select("*"),
     sb.from("daily_reports").select("*"),
     sb.from("settlement_notes").select("project_id, reason").eq("year_month", ym),
     getHolidaySet(),
+    getSettings(),
   ]);
   const projects = (projData ?? []) as Project[];
   const daily = (dailyData ?? []) as DailyReport[];
@@ -171,21 +180,22 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     if (n.project_id) noteMap.set(n.project_id, n.reason ?? "");
   });
 
-  const [yy, mm] = ym.split("-").map(Number);
-  const monthStart = new Date(yy, mm - 1, 1);
-  const monthEnd = new Date(yy, mm, 0); // 当月末日
-  const daysInMonth = monthEnd.getDate();
+  const [yy] = ym.split("-").map(Number);
+  // 締め日ベースの集計期間
+  const period = periodOf(ym, settings);
+  const monthStart = period.start;
+  const monthEnd = period.end;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
   const monthComplete = today > monthEnd;
+  const wage = hourlyWage(settings);
+  const stdMin = settings.standard_minutes;
 
-  // 日付→YYYY-MM-DD（祝日判定・稼働日計算に使用）
-  const ymdStr = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const ymdStr = (d: Date) => ymdOf(d);
 
   const monthDaily = daily.filter(
-    (d) => String(d.date).startsWith(ym) && countsAsWork(d.attendance_type)
+    (d) => inPeriod(String(d.date), period) && countsAsWork(d.attendance_type)
   );
 
   const schedByProject = new Map<string, number | null>();
@@ -193,16 +203,22 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     schedByProject.set(`${p.company}||${p.project_name}`, scheduledHours(p))
   );
 
-  // 月間集計（実績）
+  // 月間集計（実績）＋ 残業代
   let totalWorked = 0;
   let overtime = 0;
   let scheduleOver = 0;
+  let pay: PayTotals = emptyTotals();
   monthDaily.forEach((d) => {
     const dayTotal = (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0);
     totalWorked += dayTotal;
     if (dayTotal > OVERTIME_BASE_HOURS) overtime += dayTotal - OVERTIME_BASE_HOURS;
     const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;
     if (sched !== null && dayTotal > sched) scheduleOver += dayTotal - sched;
+    // 残業代（自社定時＝所定として法定内/法定外/深夜を1分単位で算出）
+    const sess = parseSessions(d.work_sessions);
+    if (sess.length && wage > 0) {
+      pay = addDayToTotals(pay, computeDayPay(sess, d.break_time || "", stdMin, wage));
+    }
   });
   const workDays = new Set(monthDaily.map((d) => d.date)).size;
 
@@ -258,8 +274,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
     const holWork = worksOnHolidays(p);
     let pTot = 0;
     let pEl = 0;
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dt = new Date(yy, mm - 1, day);
+    for (let dt = new Date(monthStart); dt <= monthEnd; dt.setDate(dt.getDate() + 1)) {
       if (end && dt > end) break; // 終了日以降は数えない
       const wd = dt.getDay();
       const isWorkday = wdset.has(wd) && (holWork || !holidays.has(ymdStr(dt)));
@@ -354,7 +369,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       return { start: w.start, end: ymdStr(sun), hours: w.hours, ot: w.ot, days: w.days.size };
     });
 
-  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks };
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage };
 }
 
 /** 精算の理由メモを保存（月×案件ごと） */

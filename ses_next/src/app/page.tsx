@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getCurrentUser } from "@/lib/actions";
 import { getSettlement } from "@/lib/projects-actions";
-import { listAllDaily, listGrants, listTodos, listInterviews } from "@/lib/domain-actions";
+import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
 import { countsAsWork, monthWorkLevel, parseNum, hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 
@@ -32,15 +32,13 @@ export default async function HomePage() {
   let settlement: Awaited<ReturnType<typeof getSettlement>> | null = null;
   let daily: Awaited<ReturnType<typeof listAllDaily>> = [];
   let grants: Awaited<ReturnType<typeof listGrants>> = [];
-  let todos: Awaited<ReturnType<typeof listTodos>> = [];
   let interviews: Awaited<ReturnType<typeof listInterviews>> = [];
   let holidays = new Set<string>();
   try {
-    [settlement, daily, grants, todos, interviews, holidays] = await Promise.all([
+    [settlement, daily, grants, interviews, holidays] = await Promise.all([
       getSettlement(ym),
       listAllDaily(),
       listGrants(),
-      listTodos(),
       listInterviews(),
       getHolidaySet(),
     ]);
@@ -98,7 +96,6 @@ export default async function HomePage() {
   const consumed = daily.reduce((s, d) => s + (CONSUME[d.attendance_type] ?? 0), 0);
   const leaveRemain = grantedValid - consumed;
 
-  const openTodos = todos.filter((t) => t.progress !== "完了");
   const waitingIv = interviews.filter((i) => i.status === "結果待ち");
 
   // 通知
@@ -161,17 +158,14 @@ export default async function HomePage() {
               </Link>
             ) : null}
 
-            {/* 未完ToDo / 面談 */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link href="/interviews" className="card card-hover">
-                <div className="metric-label">未完ToDo</div>
-                <div className="metric-value">{openTodos.length}<span className="metric-unit">件</span></div>
-              </Link>
-              <Link href="/interviews" className="card card-hover">
-                <div className="metric-label">結果待ち面談</div>
-                <div className="metric-value">{waitingIv.length}<span className="metric-unit">件</span></div>
-              </Link>
-            </div>
+            {/* 面談 */}
+            <Link href="/interviews" className="mt-3 block card card-hover">
+              <div className="flex items-center justify-between">
+                <span className="metric-label">結果待ちの面談</span>
+                <span className="text-xs" style={{ color: "var(--subtle)" }}>面談へ ›</span>
+              </div>
+              <div className="metric-value">{waitingIv.length}<span className="metric-unit">件</span></div>
+            </Link>
 
             {/* クイックリンク */}
             <div className="mt-4 grid grid-cols-3 gap-2">
