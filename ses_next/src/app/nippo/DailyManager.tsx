@@ -98,8 +98,8 @@ function fromReport(r: DailyReport): FormState {
     breakTime: r.break_time || "00:00",
     lateEarly: r.late_early_time && r.late_early_time !== "0" ? r.late_early_time : "",
     isReturn: !!r.return_office_hours && r.return_office_hours !== "0",
-    returnStart: "18:00",
-    returnEnd: "20:00",
+    returnStart: r.return_office_start || "18:00",
+    returnEnd: r.return_office_end || "20:00",
     content: r.work_content || "",
     remarks: r.remarks || "",
   };
@@ -220,6 +220,8 @@ export default function DailyManager({
       break_time: f.breakTime,
       late_early_time: LATE_EARLY_TYPES.has(f.att) ? f.lateEarly : "0",
       return_office_hours: f.isReturn ? String(Math.round(officeH * 60) / 60) : "0",
+      return_office_start: f.isReturn ? f.returnStart : "",
+      return_office_end: f.isReturn ? f.returnEnd : "",
       work_content: f.content,
       remarks: f.remarks,
     };

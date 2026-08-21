@@ -64,6 +64,8 @@ export type DailyInput = {
   break_time: string; // 休憩(HH:MM)
   late_early_time: string;
   return_office_hours: string;
+  return_office_start: string;
+  return_office_end: string;
   work_content: string;
   remarks: string;
 };
@@ -99,6 +101,8 @@ function buildRow(input: DailyInput, userId: string) {
     late_early_time: lateEarly,
     return_office_hours: returnOffice,
     work_sessions: needsTime ? JSON.stringify(validSessions) : "",
+    return_office_start: needsTime && input.return_office_hours && parseFloat(input.return_office_hours) > 0 ? (input.return_office_start || "") : "",
+    return_office_end: needsTime && input.return_office_hours && parseFloat(input.return_office_hours) > 0 ? (input.return_office_end || "") : "",
     work_content: needsTime ? input.work_content.trim() : "",
     remarks: input.remarks.trim(),
     _wh: wh,

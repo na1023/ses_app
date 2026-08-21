@@ -1,5 +1,7 @@
 import { getCurrentUser } from "@/lib/actions";
 import { listAllDaily } from "@/lib/domain-actions";
+import { getSettings } from "@/lib/settings-actions";
+import { periodOf, inPeriod } from "@/lib/period";
 import { DailyReport, countsAsWork, ATT_COLOR, parseNum } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "../settlement/MonthNav";
@@ -17,13 +19,18 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
 
   let daily: DailyReport[] = [];
   let err = "";
+  let periodLabel = "";
   try {
-    daily = await listAllDaily();
+    const [d, s] = await Promise.all([listAllDaily(), getSettings()]);
+    daily = d;
+    const p = periodOf(ym, s);
+    periodLabel = p.label;
+    daily = daily.filter((x) => inPeriod(String(x.date), p));
   } catch (e) {
     err = e instanceof Error ? e.message : String(e);
   }
 
-  const month = daily.filter((d) => String(d.date).startsWith(ym));
+  const month = daily;
   const workRows = month.filter((d) => countsAsWork(d.attendance_type));
   const siteHours = workRows.reduce((s, d) => s + (Number(d.work_hours) || 0), 0);
   const officeHours = workRows.reduce((s, d) => s + (parseNum(d.return_office_hours) ?? 0), 0);
@@ -50,6 +57,7 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
       <AppHeader title="レポート" subtitle="月次の稼働サマリー" email={user?.email} />
       <div className="px-4 pt-4">
         <MonthNav ym={ym} base="/report" />
+        {periodLabel ? <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{periodLabel}</p> : null}
 
         {err ? (
           <div className="mt-4 card text-sm" style={{ color: "#f87171" }}>読み込みエラー: {err}</div>

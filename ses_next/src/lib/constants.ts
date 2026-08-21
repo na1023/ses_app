@@ -10,6 +10,8 @@ export type DailyReport = {
   work_hours: number | string;
   late_early_time: string;
   return_office_hours: string;
+  return_office_start: string;
+  return_office_end: string;
   work_sessions: string; // 複数勤務セッションの JSON: [{start,end}]
   work_content: string;
   remarks: string;

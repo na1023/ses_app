@@ -6,6 +6,7 @@ import MonthNav from "./MonthNav";
 import ReasonEditor from "./ReasonEditor";
 import ShareButton, { ShareData } from "./ShareButton";
 import ClosingSwitch from "./ClosingSwitch";
+import PeriodPicker from "./PeriodPicker";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +40,17 @@ const STATE_META: Record<string, { label: string; color: string }> = {
 export default async function SettlementPage({
   searchParams,
 }: {
-  searchParams: { ym?: string };
+  searchParams: { ym?: string; start?: string; end?: string };
 }) {
   const user = await getCurrentUser();
   const ym = searchParams.ym || currentYm();
+  const customStart = searchParams.start || "";
+  const customEnd = searchParams.end || "";
 
   let data: SettlementResult | null = null;
   let loadError = "";
   try {
-    data = await getSettlement(ym);
+    data = await getSettlement(ym, customStart && customEnd ? { customStart, customEnd } : undefined);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
   }
@@ -70,6 +73,7 @@ export default async function SettlementPage({
           max: r.max,
           state: STATE_META[r.state]?.label ?? "—",
         })),
+        days: data.days,
       }
     : null;
 
@@ -82,6 +86,7 @@ export default async function SettlementPage({
           <div className="flex-1">
             <MonthNav ym={ym} />
           </div>
+          <PeriodPicker startInit={customStart} endInit={customEnd} />
           {shareData ? <ShareButton data={shareData} /> : null}
         </div>
         {data ? (
@@ -152,33 +157,6 @@ export default async function SettlementPage({
               残業＝各日(現場＋帰社)が8hを超えた分。就業時間超過＝案件の定時を超えた分。
             </p>
 
-            {/* 週別（勤務・残業） */}
-            <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>週別（勤務・残業）</h2>
-            {data.weeks.length === 0 ? (
-              <p className="text-sm" style={{ color: "var(--subtle)" }}>この月のデータはありません。</p>
-            ) : (
-              <div className="card space-y-3">
-                {(() => {
-                  const maxH = Math.max(...data.weeks.map((w) => w.hours), 1);
-                  const md = (s: string) => { const [, m, dd] = s.split("-"); return `${Number(m)}/${Number(dd)}`; };
-                  return data.weeks.map((w) => (
-                    <div key={w.start}>
-                      <div className="mb-1 flex items-center justify-between text-sm">
-                        <span className="font-semibold">{md(w.start)}〜{md(w.end)}</span>
-                        <span style={{ color: "var(--muted)" }}>
-                          {w.hours.toFixed(2)}h（{hm(w.hours)}）・{w.days}日
-                          {w.ot > 0 ? <span style={{ color: "#f59e0b" }}> ・残業{w.ot.toFixed(2)}h</span> : null}
-                        </span>
-                      </div>
-                      <div className="bar-track">
-                        <div className="bar-fill" style={{ width: `${(w.hours / maxH) * 100}%`, background: w.ot > 0 ? "#f59e0b" : "#3b82f6" }} />
-                      </div>
-                    </div>
-                  ));
-                })()}
-              </div>
-            )}
-
             {/* 残業代（自社定時基準・1分単位） */}
             {data.hourly > 0 ? (
               <>
@@ -200,9 +178,20 @@ export default async function SettlementPage({
                 </div>
               </>
             ) : (
-              <div className="mt-6 card text-xs" style={{ color: "var(--subtle)" }}>
-                残業代を表示するには「設定」で自社の定時を設定し、「給与管理」から直近月の基本給を登録してください。
-              </div>
+              <>
+                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（未計算）</h2>
+                <div className="card text-sm" style={{ borderColor: "#78500f", background: "#3a2a06" }}>
+                  <div className="font-bold" style={{ color: "#fbbf24" }}>残業代を計算するには以下が必要です：</div>
+                  <ul className="mt-2 space-y-1 text-xs" style={{ color: "var(--muted)" }}>
+                    <li>{data.baseSalary > 0 ? "✅" : "⬜"} 給与管理に直近月の <b>基本給</b>（{data.baseSalary > 0 ? `¥${data.baseSalary.toLocaleString()}` : "未登録"}）</li>
+                    <li>{"⬜"} 設定で <b>自社の定時</b>（開始〜終了＋休憩）</li>
+                  </ul>
+                  <div className="mt-2 flex gap-2">
+                    <a className="btn-ghost" href="/salary">給与管理へ</a>
+                    <a className="btn-ghost" href="/settings">設定へ</a>
+                  </div>
+                </div>
+              </>
             )}
 
             {/* 案件ごとの精算 */}
@@ -335,6 +324,43 @@ export default async function SettlementPage({
                   );
                 })}
               </ul>
+            )}
+
+            {/* 週別（勤務・残業）— 可視化強化：定時分と残業分の積み上げ表示 */}
+            <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>週別（勤務・残業）</h2>
+            {data.weeks.length === 0 ? (
+              <p className="text-sm" style={{ color: "var(--subtle)" }}>この期間のデータはありません。</p>
+            ) : (
+              <div className="card space-y-3">
+                {(() => {
+                  const maxH = Math.max(...data.weeks.map((w) => w.hours), 40);
+                  const md = (s: string) => { const [, m, dd] = s.split("-"); return `${Number(m)}/${Number(dd)}`; };
+                  return data.weeks.map((w) => {
+                    const base = Math.max(0, w.hours - w.ot);
+                    const basePct = Math.min(100, (base / maxH) * 100);
+                    const otPct = Math.min(100 - basePct, (w.ot / maxH) * 100);
+                    return (
+                      <div key={w.start}>
+                        <div className="mb-1 flex items-center justify-between text-sm">
+                          <span className="font-semibold">{md(w.start)}〜{md(w.end)}</span>
+                          <span style={{ color: "var(--muted)" }}>
+                            {w.hours.toFixed(2)}h（{hm(w.hours)}）・{w.days}日
+                            {w.ot > 0 ? <span style={{ color: "#f59e0b" }}>　残業 {w.ot.toFixed(2)}h（{hm(w.ot)}）</span> : null}
+                          </span>
+                        </div>
+                        <div className="bar-track flex" style={{ overflow: "hidden" }}>
+                          <div style={{ width: `${basePct}%`, background: "#3b82f6", height: "100%" }} />
+                          <div style={{ width: `${otPct}%`, background: "#f59e0b", height: "100%" }} />
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+                <div className="mt-1 flex gap-3 text-xs" style={{ color: "var(--subtle)" }}>
+                  <span><span className="inline-block h-2 w-3 align-middle" style={{ background: "#3b82f6" }} /> 定時内</span>
+                  <span><span className="inline-block h-2 w-3 align-middle" style={{ background: "#f59e0b" }} /> 残業(8h超)</span>
+                </div>
+              </div>
             )}
           </>
         ) : null}

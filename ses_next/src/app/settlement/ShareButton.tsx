@@ -12,6 +12,7 @@ export type ShareData = {
   pay: { inner: number; outer: number; night: number; total: number };
   weeks: { start: string; end: string; hours: number; ot: number; days: number }[];
   rows: { company: string; project: string; worked: number; min: number | null; max: number | null; state: string }[];
+  days: { date: string; company: string; project: string; att: string; site: number; office: number; total: number; ot: number }[];
 };
 
 const ITEMS: { key: string; label: string }[] = [
@@ -20,6 +21,7 @@ const ITEMS: { key: string; label: string }[] = [
   { key: "pay", label: "残業代（時給・内訳）" },
   { key: "weeks", label: "週別集計" },
   { key: "projects", label: "案件別 精算状況" },
+  { key: "days", label: "日別内訳（日付ごとの勤務・残業）" },
 ];
 
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -28,7 +30,7 @@ const md = (s: string) => { const [, m, d] = s.split("-"); return `${Number(m)}/
 export default function ShareButton({ data }: { data: ShareData }) {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Record<string, boolean>>({
-    summary: true, overtime: true, pay: true, weeks: false, projects: true,
+    summary: true, overtime: true, pay: true, weeks: false, projects: true, days: false,
   });
   const [copied, setCopied] = useState(false);
 
@@ -47,6 +49,19 @@ export default function ShareButton({ data }: { data: ShareData }) {
       data.rows.forEach((r) =>
         L.push(`  ${r.company} / ${r.project} … ${r.worked.toFixed(2)}h（精算${r.min ?? "—"}〜${r.max ?? "—"}・${r.state}）`)
       );
+    }
+    if (sel.days && data.days.length) {
+      L.push("■ 日別内訳");
+      data.days.forEach((d) => {
+        const parts = [
+          `${d.date}(${d.att})`,
+          d.company ? `${d.company}${d.project ? "/" + d.project : ""}` : "",
+          `勤務${d.total.toFixed(2)}h`,
+          d.office > 0 ? `(現場${d.site.toFixed(2)}+帰社${d.office.toFixed(2)})` : "",
+          d.ot > 0 ? `残業${d.ot.toFixed(2)}h` : "",
+        ].filter(Boolean);
+        L.push("  " + parts.join(" "));
+      });
     }
     return L.join("\n");
   }

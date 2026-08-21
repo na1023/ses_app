@@ -127,6 +127,7 @@ export type SettlementRow = {
 export type LawWarning = { level: "danger" | "warn" | "info"; text: string };
 
 export type WeekSummary = { start: string; end: string; hours: number; ot: number; days: number };
+export type DayEntry = { date: string; company: string; project: string; att: string; site: number; office: number; total: number; ot: number };
 
 export type SettlementResult = {
   ym: string;
@@ -144,6 +145,7 @@ export type SettlementResult = {
   hourly: number; // 時給（円/時）
   closingType: "month_end" | "day_15";
   baseSalary: number;
+  days: DayEntry[];
 };
 
 function parseDate(s: string): Date | null {
@@ -166,7 +168,7 @@ async function getHolidaySet(): Promise<Set<string>> {
   }
 }
 
-export async function getSettlement(ym: string, override?: { closing_type?: "month_end" | "day_15" }): Promise<SettlementResult> {
+export async function getSettlement(ym: string, override?: { closing_type?: "month_end" | "day_15"; customStart?: string; customEnd?: string }): Promise<SettlementResult> {
   const sb = createClient();
   const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays, settingsRaw, baseSalary] = await Promise.all([
     sb.from("projects").select("*"),
@@ -186,7 +188,15 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
   const [yy] = ym.split("-").map(Number);
   // 締め日ベースの集計期間（override で一時切替）
   const settings = override?.closing_type ? { ...settingsRaw, closing_type: override.closing_type } : settingsRaw;
-  const period = periodOf(ym, settings);
+  let period = periodOf(ym, settings);
+  if (override?.customStart && override?.customEnd) {
+    const s = new Date(override.customStart);
+    const e = new Date(override.customEnd);
+    if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
+      const md = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
+      period = { start: s, end: e, startStr: override.customStart, endStr: override.customEnd, label: `${md(s)}〜${md(e)}（カスタム期間）` };
+    }
+  }
   const monthStart = period.start;
   const monthEnd = period.end;
   const today = new Date();
@@ -216,8 +226,13 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
   let overtimeMin = 0;
   let scheduleOverMin = 0;
   let pay: PayTotals = emptyTotals();
+  const days: DayEntry[] = [];
   monthDaily.forEach((d) => {
-    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    const siteMin = toMin(Number(d.work_hours) || 0);
+    const officeMin = toMin(parseNum(d.return_office_hours) ?? 0);
+    const dayMin = siteMin + officeMin;
+    const dayOt = dayMin > LEGAL_MIN ? dayMin - LEGAL_MIN : 0;
+    days.push({ date: String(d.date), company: d.company || "", project: d.project_name || "", att: d.attendance_type || "", site: siteMin / 60, office: officeMin / 60, total: dayMin / 60, ot: dayOt / 60 });
     totalMin += dayMin;
     if (dayMin > LEGAL_MIN) overtimeMin += dayMin - LEGAL_MIN;
     const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;
@@ -387,7 +402,8 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
       return { start: w.start, end: ymdStr(sun), hours: w.hoursMin / 60, ot: w.otMin / 60, days: w.days.size };
     });
 
-  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage, closingType: settings.closing_type, baseSalary };
+  days.sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage, closingType: settings.closing_type, baseSalary, days };
 }
 
 /** 精算の理由メモを保存（月×案件ごと） */
