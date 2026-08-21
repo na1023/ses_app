@@ -102,12 +102,6 @@ export default async function HomePage() {
   const notes: { level: "danger" | "warn" | "info"; text: string }[] = [];
   (settlement?.warnings ?? []).forEach((w) => notes.push(w));
   if (soon.length > 0) notes.push({ level: "warn", text: `有給が失効間近です（${soon.join(" / ")}）。計画的に取得しましょう。` });
-  if (settlement && settlement.hourly === 0) {
-    const need = [] as string[];
-    if (settlement.baseSalary === 0) need.push("給与管理で基本給を登録");
-    need.push("設定で自社の定時を確認");
-    notes.push({ level: "info", text: `残業代を自動計算するには：${need.join(" / ")}` });
-  }
 
   const cM = (c: string) => ({ background: c + "12", borderColor: c });
 

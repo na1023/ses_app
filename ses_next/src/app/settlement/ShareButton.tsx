@@ -8,8 +8,7 @@ export type ShareData = {
   workDays: number;
   overtime: number;
   scheduleOver: number;
-  hourly: number;
-  pay: { inner: number; outer: number; night: number; total: number };
+  payMin: { innerOtMin: number; outerOtMin: number; nightMin: number };
   weeks: { start: string; end: string; hours: number; ot: number; days: number }[];
   rows: { company: string; project: string; worked: number; min: number | null; max: number | null; state: string }[];
   days: { date: string; company: string; project: string; att: string; site: number; office: number; total: number; ot: number }[];
@@ -18,7 +17,7 @@ export type ShareData = {
 const ITEMS: { key: string; label: string }[] = [
   { key: "summary", label: "総勤務時間・勤務日数" },
   { key: "overtime", label: "残業・就業時間超過" },
-  { key: "pay", label: "残業代（時給・内訳）" },
+  { key: "otbreak", label: "残業時間内訳（法定内/外/深夜）" },
   { key: "weeks", label: "週別集計" },
   { key: "projects", label: "案件別 精算状況" },
   { key: "days", label: "日別内訳" },
@@ -35,13 +34,12 @@ const DAY_FIELDS: { key: string; label: string }[] = [
   { key: "ot", label: "残業時間" },
 ];
 
-const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
 const md = (s: string) => { const [, m, d] = s.split("-"); return `${Number(m)}/${Number(d)}`; };
 
 export default function ShareButton({ data }: { data: ShareData }) {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Record<string, boolean>>({
-    summary: true, overtime: true, pay: true, weeks: false, projects: true, days: false,
+    summary: true, overtime: true, otbreak: false, weeks: false, projects: true, days: false,
   });
   // 日別内訳のサブ項目 選択状態（既定は全部ON）
   const [dayFields, setDayFields] = useState<Record<string, boolean>>({
@@ -53,8 +51,14 @@ export default function ShareButton({ data }: { data: ShareData }) {
     const L: string[] = [`【稼働レポート】${data.periodLabel}`];
     if (sel.summary) L.push(`■ 総勤務 ${data.totalWorked.toFixed(2)}h / ${data.workDays}日`);
     if (sel.overtime) L.push(`■ 残業(8h超) ${data.overtime.toFixed(2)}h ／ 就業時間超過 ${data.scheduleOver.toFixed(2)}h`);
-    if (sel.pay && data.hourly > 0)
-      L.push(`■ 残業代 ${yen(data.pay.total)}（法定内${yen(data.pay.inner)} / 法定外${yen(data.pay.outer)} / 深夜${yen(data.pay.night)}）時給${yen(data.hourly)}/h`);
+    if (sel.otbreak) {
+      const hm = (min: number) => {
+        if (min <= 0) return "0";
+        const h = Math.floor(min / 60), m = Math.round(min % 60);
+        return m === 0 ? `${h}時間` : `${h}時間${m}分`;
+      };
+      L.push(`■ 残業内訳 法定内${hm(data.payMin.innerOtMin)} / 法定外${hm(data.payMin.outerOtMin)} / 深夜${hm(data.payMin.nightMin)}`);
+    }
     if (sel.weeks && data.weeks.length) {
       L.push("■ 週別");
       data.weeks.forEach((w) => L.push(`  ${md(w.start)}〜${md(w.end)} ${w.hours.toFixed(2)}h${w.ot > 0 ? `（残業${w.ot.toFixed(2)}h）` : ""} ${w.days}日`));

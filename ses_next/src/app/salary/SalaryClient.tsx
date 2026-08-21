@@ -7,7 +7,6 @@ import {
   INCOME_FIELDS,
   DEDUCTION_FIELDS,
   salarySummary,
-  toInt,
   yen,
 } from "@/lib/salary";
 import { saveSalary, deleteSalary } from "@/lib/domain-actions";
@@ -23,9 +22,9 @@ function currentYm() {
 
 type FormState = Partial<SalaryRecord> & { id?: string; year_month: string };
 
-export default function SalaryClient({ records, predicted }: { records: SalaryRecord[]; predicted: Record<string, Predicted> }) {
+export default function SalaryClient({ records }: { records: SalaryRecord[]; predicted?: Record<string, Predicted> }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"list" | "form" | "year" | "compare">("list");
+  const [tab, setTab] = useState<"list" | "form" | "year">("list");
   const [form, setForm] = useState<FormState>({ year_month: currentYm(), salary_type: "給与" });
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, start] = useTransition();
@@ -87,47 +86,7 @@ export default function SalaryClient({ records, predicted }: { records: SalaryRe
         <button data-active={tab === "list"} onClick={() => setTab("list")}>月別一覧</button>
         <button data-active={tab === "form"} onClick={newRec}>登録</button>
         <button data-active={tab === "year"} onClick={() => setTab("year")}>年収</button>
-        <button data-active={tab === "compare"} onClick={() => setTab("compare")}>予想比較</button>
       </div>
-
-      {/* ===== 予想 vs 実際（総支給ベース） ===== */}
-      {tab === "compare" ? (
-        records.length === 0 ? (
-          <p className="text-sm" style={{ color: "var(--subtle)" }}>給与データがありません。</p>
-        ) : (
-          <ul className="space-y-3">
-            {records.map((r) => {
-              const p = predicted[r.year_month];
-              const actual = INCOME_FIELDS.reduce((s, [k]) => s + toInt(r[k]), 0); // 実際の総支給
-              const pred = p?.gross ?? 0;
-              const diff = actual - pred;
-              return (
-                <li key={r.id} className="card">
-                  <div className="mb-1 font-bold">{r.year_month}{r.salary_type === "賞与" ? "（賞与）" : ""}</div>
-                  {!p?.hasWage ? (
-                    <p className="text-xs" style={{ color: "var(--subtle)" }}>予想には「設定」で月額基本給・自社定時・年間所定労働日数の入力が必要です。</p>
-                  ) : (
-                    <>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div><div className="text-xs" style={{ color: "var(--subtle)" }}>予想総支給</div><div className="font-bold">{yen(pred)}</div></div>
-                        <div><div className="text-xs" style={{ color: "var(--subtle)" }}>実際総支給</div><div className="font-bold">{yen(actual)}</div></div>
-                        <div><div className="text-xs" style={{ color: "var(--subtle)" }}>差額</div><div className="font-bold" style={{ color: diff >= 0 ? "#10b981" : "#ef4444" }}>{diff >= 0 ? "+" : ""}{yen(diff)}</div></div>
-                      </div>
-                      <div className="mt-2 space-y-0.5 border-t pt-2 text-xs" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                        <div className="flex justify-between"><span>基本給</span><span>{yen(p.base)}</span></div>
-                        {p.allow > 0 ? <div className="flex justify-between"><span>固定手当</span><span>{yen(p.allow)}</span></div> : null}
-                        <div className="flex justify-between"><span>法定内残業(100%)</span><span>{yen(p.inner)}</span></div>
-                        <div className="flex justify-between"><span>法定外残業(125%)</span><span style={{ color: "#f59e0b" }}>{yen(p.outer)}</span></div>
-                        <div className="flex justify-between"><span>深夜割増(+25%)</span><span style={{ color: "#6366f1" }}>{yen(p.night)}</span></div>
-                      </div>
-                    </>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )
-      ) : null}
 
       {/* ===== 月別一覧 ===== */}
       {tab === "list" ? (

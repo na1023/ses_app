@@ -47,8 +47,7 @@ export default async function SettlementPage({
         workDays: data.workDays,
         overtime: data.overtime,
         scheduleOver: data.scheduleOver,
-        hourly: data.hourly,
-        pay: { inner: data.pay.innerPay, outer: data.pay.outerPay, night: data.pay.nightPay, total: data.pay.total },
+        payMin: { innerOtMin: data.pay.innerOtMin, outerOtMin: data.pay.outerOtMin, nightMin: data.pay.nightMin },
         weeks: data.weeks.map((w) => ({ start: w.start, end: w.end, hours: w.hours, ot: w.ot, days: w.days })),
         rows: data.rows.map((r) => ({
           company: r.company,
@@ -143,75 +142,36 @@ export default async function SettlementPage({
             </p>
 
             {/* 残業代（自社定時基準・1分単位） */}
-            {data.hourly > 0 ? (
-              <>
-                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（法律に基づく概算）</h2>
-                <div className="card">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm" style={{ color: "var(--subtle)" }}>時給（基本給 ÷ 月平均所定労働時間）</span>
-                    <span className="font-bold shrink-0">¥{Math.round(data.hourly).toLocaleString()}/h</span>
+            {/* 残業内訳（時間のみ・法律区分ごと） */}
+            <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業内訳（時間）</h2>
+            <div className="card">
+              <div className="grid grid-cols-1 gap-2">
+                <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                    <span>① 法定内残業（100%）</span>
+                    <span>自社の所定 → 8時間まで</span>
                   </div>
-
-                  {/* 残業区分の内訳（各種類を必ず表示） */}
-                  <div className="mt-3 grid grid-cols-1 gap-2">
-                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
-                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
-                        <span>① 法定内残業（100%）</span>
-                        <span>自社の所定 → 8時間まで</span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-sm">{data.pay.innerOtMin > 0 ? hm(data.pay.innerOtMin / 60) : "0"}</span>
-                        <b>¥{Math.round(data.pay.innerPay).toLocaleString()}</b>
-                      </div>
-                    </div>
-                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
-                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
-                        <span>② 法定外残業（125%）</span>
-                        <span>1日8時間超</span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-sm">{data.pay.outerOtMin > 0 ? hm(data.pay.outerOtMin / 60) : "0"}</span>
-                        <b style={{ color: data.pay.outerOtMin > 0 ? "#f59e0b" : undefined }}>¥{Math.round(data.pay.outerPay).toLocaleString()}</b>
-                      </div>
-                    </div>
-                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
-                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
-                        <span>③ 深夜割増（+25%）</span>
-                        <span>22:00〜翌5:00</span>
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <span className="text-sm">{data.pay.nightMin > 0 ? hm(data.pay.nightMin / 60) : "0"}</span>
-                        <b style={{ color: data.pay.nightMin > 0 ? "#6366f1" : undefined }}>¥{Math.round(data.pay.nightPay).toLocaleString()}</b>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between border-t pt-2 font-bold" style={{ borderColor: "var(--border)" }}>
-                    <span>残業代合計</span>
-                    <span className="text-lg" style={{ color: "#10b981" }}>¥{Math.round(data.pay.total).toLocaleString()}</span>
-                  </div>
-                  <p className="mt-2 text-xs" style={{ color: "var(--subtle)" }}>
-                    ※ 労基法の割増率に基づき、自社の所定労働時間（設定）を基準に算出。案件先の就業時間は「就業時間超過」の判定にのみ使用します。
-                    法定外×深夜は 125%+25% = 150% になります。
-                  </p>
+                  <div className="mt-1 text-right font-bold">{data.pay.innerOtMin > 0 ? hm(data.pay.innerOtMin / 60) : "0"}</div>
                 </div>
-              </>
-            ) : (
-              <>
-                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（未計算）</h2>
-                <div className="card text-sm" style={{ borderColor: "#78500f", background: "#3a2a06" }}>
-                  <div className="font-bold" style={{ color: "#fbbf24" }}>残業代を計算するには以下が必要です：</div>
-                  <ul className="mt-2 space-y-1 text-xs" style={{ color: "var(--muted)" }}>
-                    <li>{data.baseSalary > 0 ? "✅" : "⬜"} 給与管理に直近月の <b>基本給</b>（{data.baseSalary > 0 ? `¥${data.baseSalary.toLocaleString()}` : "未登録"}）</li>
-                    <li>{"⬜"} 設定で <b>自社の定時</b>（開始〜終了＋休憩）</li>
-                  </ul>
-                  <div className="mt-2 flex gap-2">
-                    <a className="btn-ghost" href="/salary">給与管理へ</a>
-                    <a className="btn-ghost" href="/settings">設定へ</a>
+                <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                    <span>② 法定外残業（125%）</span>
+                    <span>1日8時間超</span>
                   </div>
+                  <div className="mt-1 text-right font-bold" style={{ color: data.pay.outerOtMin > 0 ? "#f59e0b" : undefined }}>{data.pay.outerOtMin > 0 ? hm(data.pay.outerOtMin / 60) : "0"}</div>
                 </div>
-              </>
-            )}
+                <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                  <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                    <span>③ 深夜労働（+25%）</span>
+                    <span>22:00〜翌5:00</span>
+                  </div>
+                  <div className="mt-1 text-right font-bold" style={{ color: data.pay.nightMin > 0 ? "#6366f1" : undefined }}>{data.pay.nightMin > 0 ? hm(data.pay.nightMin / 60) : "0"}</div>
+                </div>
+              </div>
+              <p className="mt-2 text-xs" style={{ color: "var(--subtle)" }}>
+                ※ 労基法の割増率に基づく区分表示。自社の所定労働時間（設定）を基準に算出します。
+              </p>
+            </div>
 
             {/* 案件ごとの精算 */}
             <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>
