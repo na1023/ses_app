@@ -33,14 +33,19 @@ export function hoursLabel(h: number): string {
   return `${h.toFixed(2)}（${hm(h)}）`;
 }
 
-/** セッション配列から実働合計(h)を計算 */
-export function sessionsHours(sessions: WorkSession[]): number {
+/** セッション配列から実働合計(分)を計算（分単位精度） */
+export function sessionsMinutes(sessions: WorkSession[]): number {
   return sessions.reduce((s, seg) => {
     const a = hhmmToMin(seg.start);
     const b = hhmmToMin(seg.end);
     if (a == null || b == null || b <= a) return s;
-    return s + (b - a) / 60;
+    return s + (b - a);
   }, 0);
+}
+
+/** セッション配列から実働合計(h)を計算 */
+export function sessionsHours(sessions: WorkSession[]): number {
+  return sessionsMinutes(sessions) / 60;
 }
 
 // ============================================================

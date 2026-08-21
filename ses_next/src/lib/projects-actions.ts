@@ -12,6 +12,8 @@ import {
   projectWorkDays,
   worksOnHolidays,
   parseSessions,
+  sessionsMinutes,
+  hhmmToMin,
   OVERTIME_BASE_HOURS,
 } from "./constants";
 import { getSettings, getAutoBaseSalary } from "./settings-actions";
@@ -221,6 +223,29 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
   const toMin = (h: number) => Math.round(h * 60);
   const LEGAL_MIN = OVERTIME_BASE_HOURS * 60; // 480
 
+  /**
+   * 1日の実働分数を「時刻データから正確に再計算」する。
+   * これにより DB の小数(float)誤差の累積を防ぐ。
+   * work_sessions/return_office_start/end が無い旧データは work_hours にフォールバック。
+   */
+  function siteMinOf(d: DailyReport): number {
+    const sess = parseSessions(d.work_sessions);
+    if (sess.length > 0) {
+      const brk = hhmmToMin(d.break_time || "") ?? 0;
+      return Math.max(0, sessionsMinutes(sess) - brk);
+    }
+    return toMin(Number(d.work_hours) || 0);
+  }
+  function officeMinOf(d: DailyReport): number {
+    const s = hhmmToMin(d.return_office_start || "");
+    const e = hhmmToMin(d.return_office_end || "");
+    if (s !== null && e !== null && e > s) return e - s;
+    return toMin(parseNum(d.return_office_hours) ?? 0);
+  }
+  function dayTotalMin(d: DailyReport): number {
+    return siteMinOf(d) + officeMinOf(d);
+  }
+
   // 月間集計（実績）＋ 残業代
   let totalMin = 0;
   let overtimeMin = 0;
@@ -228,8 +253,8 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
   let pay: PayTotals = emptyTotals();
   const days: DayEntry[] = [];
   monthDaily.forEach((d) => {
-    const siteMin = toMin(Number(d.work_hours) || 0);
-    const officeMin = toMin(parseNum(d.return_office_hours) ?? 0);
+    const siteMin = siteMinOf(d);
+    const officeMin = officeMinOf(d);
     const dayMin = siteMin + officeMin;
     const dayOt = dayMin > LEGAL_MIN ? dayMin - LEGAL_MIN : 0;
     days.push({ date: String(d.date), company: d.company || "", project: d.project_name || "", att: d.attendance_type || "", site: siteMin / 60, office: officeMin / 60, total: dayMin / 60, ot: dayOt / 60 });
@@ -258,7 +283,7 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
     const ds = String(d.date);
     if (ds.slice(0, 4) !== String(yy)) return;
     if (ds.slice(0, 7) > ym) return; // 当月より後は除外
-    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    const dayMin = dayTotalMin(d);
     if (dayMin > LEGAL_MIN) annualOtMin += dayMin - LEGAL_MIN;
   });
   const annualOvertime = annualOtMin / 60;
@@ -280,13 +305,13 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
         d.project_name === p.project_name &&
         (!end || new Date(d.date) <= end)
     );
-    const worked = days.reduce((s, d) => s + toMin(Number(d.work_hours) || 0), 0) / 60;
+    const worked = days.reduce((s, d) => s + siteMinOf(d), 0) / 60;
     const sched = scheduledHours(p);
     const schedMinP = sched !== null ? toMin(sched) : null;
     let projOtMin = 0;
     let projSchedMin = 0;
     days.forEach((d) => {
-      const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+      const dayMin = dayTotalMin(d);
       if (dayMin > LEGAL_MIN) projOtMin += dayMin - LEGAL_MIN;
       if (schedMinP !== null && dayMin > schedMinP) projSchedMin += dayMin - schedMinP;
     });
@@ -360,9 +385,7 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
     warnings.push({ level: "info", text: `当年の残業累計が${annualOvertime.toFixed(0)}hです。年間上限(360h)の8割を超えています。` });
 
   // 1日の勤務が長すぎる日（休憩後の実働が長い）
-  const longDay = monthDaily.find(
-    (d) => (Number(d.work_hours) || 0) + (parseNum(d.return_office_hours) ?? 0) > 13
-  );
+  const longDay = monthDaily.find((d) => dayTotalMin(d) > 13 * 60);
   if (longDay)
     warnings.push({ level: "warn", text: `1日の勤務が13時間を超える日があります（${longDay.date}）。休憩・健康管理にご注意ください。` });
 
@@ -387,7 +410,7 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
     const monday = new Date(dt);
     monday.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));
     const key = ymdStr(monday);
-    const dayMin = toMin(Number(d.work_hours) || 0) + toMin(parseNum(d.return_office_hours) ?? 0);
+    const dayMin = dayTotalMin(d);
     const w = weekMap.get(key) ?? { start: key, hoursMin: 0, otMin: 0, days: new Set<string>() };
     w.hoursMin += dayMin;
     if (dayMin > LEGAL_MIN) w.otMin += dayMin - LEGAL_MIN;
