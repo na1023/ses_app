@@ -3,15 +3,18 @@ import { AppSettings } from "./settings";
 // ============================================================
 // 締め日ベースの集計期間
 // month_end: 当月1日〜末日
-// day_15   : 前月16日〜当月15日（15日が土日なら直前の平日に補正）
+// day_15   : 前月16日〜当月15日（境界は常に固定）
+//           ※ 15日が土日でも「集計期間」は 16→15 のまま。
+//             土日補正は「支払日/締め日ラベル」の表示にのみ適用する。
 // ============================================================
 
-/** 15日が土日なら直前の平日へ補正 */
-function adjustClosing(d: Date): Date {
-  const w = d.getDay();
-  if (w === 6) d.setDate(d.getDate() - 1); // 土→金
-  else if (w === 0) d.setDate(d.getDate() - 2); // 日→金
-  return d;
+/** 15日が土日なら直前の平日へ補正した日付を返す（元は変更しない） */
+function shiftedClosingDay(d: Date): Date {
+  const x = new Date(d);
+  const w = x.getDay();
+  if (w === 6) x.setDate(x.getDate() - 1); // 土→金
+  else if (w === 0) x.setDate(x.getDate() - 2); // 日→金
+  return x;
 }
 
 export function ymdOf(d: Date): string {
@@ -24,12 +27,16 @@ export type Period = { start: Date; end: Date; startStr: string; endStr: string;
 export function periodOf(ym: string, s: AppSettings): Period {
   const [y, m] = ym.split("-").map(Number);
   if (s.closing_type === "day_15") {
-    const end = adjustClosing(new Date(y, m - 1, 15));
-    const prevEnd = adjustClosing(new Date(y, m - 2, 15));
-    const start = new Date(prevEnd);
-    start.setDate(start.getDate() + 1);
+    // 集計期間は「前月16日 → 当月15日」で固定（月をまたぐズレを防ぐ）
+    const start = new Date(y, m - 2, 16);
+    const end = new Date(y, m - 1, 15);
     const md = (d: Date) => `${d.getMonth() + 1}/${d.getDate()}`;
-    return { start, end, startStr: ymdOf(start), endStr: ymdOf(end), label: `${md(start)}〜${md(end)}（15日締め）` };
+    const shifted = shiftedClosingDay(end);
+    const shiftNote = shifted.getDate() !== end.getDate() ? `（15日は${md(shifted)}に補正）` : "";
+    return {
+      start, end, startStr: ymdOf(start), endStr: ymdOf(end),
+      label: `${md(start)}〜${md(end)}（15日締め）${shiftNote}`,
+    };
   }
   const start = new Date(y, m - 1, 1);
   const end = new Date(y, m, 0);
