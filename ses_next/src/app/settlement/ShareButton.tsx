@@ -21,7 +21,18 @@ const ITEMS: { key: string; label: string }[] = [
   { key: "pay", label: "残業代（時給・内訳）" },
   { key: "weeks", label: "週別集計" },
   { key: "projects", label: "案件別 精算状況" },
-  { key: "days", label: "日別内訳（日付ごとの勤務・残業）" },
+  { key: "days", label: "日別内訳" },
+];
+
+// 日別内訳のサブ項目（個別ON/OFF可能）
+const DAY_FIELDS: { key: string; label: string }[] = [
+  { key: "date", label: "日付" },
+  { key: "att", label: "勤怠区分" },
+  { key: "company", label: "会社名" },
+  { key: "project", label: "案件名" },
+  { key: "total", label: "勤務時間" },
+  { key: "sitebreak", label: "現場/帰社の内訳" },
+  { key: "ot", label: "残業時間" },
 ];
 
 const yen = (n: number) => "¥" + Math.round(n).toLocaleString();
@@ -31,6 +42,10 @@ export default function ShareButton({ data }: { data: ShareData }) {
   const [open, setOpen] = useState(false);
   const [sel, setSel] = useState<Record<string, boolean>>({
     summary: true, overtime: true, pay: true, weeks: false, projects: true, days: false,
+  });
+  // 日別内訳のサブ項目 選択状態（既定は全部ON）
+  const [dayFields, setDayFields] = useState<Record<string, boolean>>({
+    date: true, att: true, company: true, project: true, total: true, sitebreak: true, ot: true,
   });
   const [copied, setCopied] = useState(false);
 
@@ -51,17 +66,22 @@ export default function ShareButton({ data }: { data: ShareData }) {
       );
     }
     if (sel.days && data.days.length) {
-      L.push("■ 日別内訳");
-      data.days.forEach((d) => {
-        const parts = [
-          `${d.date}(${d.att})`,
-          d.company ? `${d.company}${d.project ? "/" + d.project : ""}` : "",
-          `勤務${d.total.toFixed(2)}h`,
-          d.office > 0 ? `(現場${d.site.toFixed(2)}+帰社${d.office.toFixed(2)})` : "",
-          d.ot > 0 ? `残業${d.ot.toFixed(2)}h` : "",
-        ].filter(Boolean);
-        L.push("  " + parts.join(" "));
-      });
+      // サブ項目が1つでもONの時のみ出力
+      const anyField = DAY_FIELDS.some((f) => dayFields[f.key]);
+      if (anyField) {
+        L.push("■ 日別内訳");
+        data.days.forEach((d) => {
+          const parts: string[] = [];
+          if (dayFields.date) parts.push(d.date);
+          if (dayFields.att && d.att) parts.push(`(${d.att})`);
+          if (dayFields.company && d.company) parts.push(d.company);
+          if (dayFields.project && d.project) parts.push(dayFields.company && d.company ? "/" + d.project : d.project);
+          if (dayFields.total) parts.push(`勤務${d.total.toFixed(2)}h`);
+          if (dayFields.sitebreak && d.office > 0) parts.push(`(現場${d.site.toFixed(2)}+帰社${d.office.toFixed(2)})`);
+          if (dayFields.ot && d.ot > 0) parts.push(`残業${d.ot.toFixed(2)}h`);
+          if (parts.length > 0) L.push("  " + parts.join(" "));
+        });
+      }
     }
     return L.join("\n");
   }
@@ -98,10 +118,35 @@ export default function ShareButton({ data }: { data: ShareData }) {
             </div>
             <div className="space-y-2">
               {ITEMS.map((it) => (
-                <label key={it.key} className="card flex items-center justify-between py-2.5">
-                  <span className="text-sm">{it.label}</span>
-                  <input type="checkbox" className="h-5 w-5" checked={!!sel[it.key]} onChange={(e) => setSel({ ...sel, [it.key]: e.target.checked })} />
-                </label>
+                <div key={it.key}>
+                  <label className="card flex items-center justify-between py-2.5">
+                    <span className="text-sm">{it.label}</span>
+                    <input type="checkbox" className="h-5 w-5" checked={!!sel[it.key]} onChange={(e) => setSel({ ...sel, [it.key]: e.target.checked })} />
+                  </label>
+                  {/* 日別内訳を選択したときだけ、サブ項目のON/OFFを表示 */}
+                  {it.key === "days" && sel.days ? (
+                    <div className="mt-1 rounded-xl p-2" style={{ background: "var(--surface-2)", border: "1px solid var(--border)" }}>
+                      <div className="mb-1 text-xs" style={{ color: "var(--subtle)" }}>日別で共有する項目</div>
+                      <div className="flex flex-wrap gap-2">
+                        {DAY_FIELDS.map((f) => {
+                          const on = !!dayFields[f.key];
+                          return (
+                            <button
+                              key={f.key}
+                              type="button"
+                              className="chip"
+                              data-active={on}
+                              style={on ? { background: "var(--accent)" } : undefined}
+                              onClick={() => setDayFields({ ...dayFields, [f.key]: !on })}
+                            >
+                              {f.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
               ))}
             </div>
 
