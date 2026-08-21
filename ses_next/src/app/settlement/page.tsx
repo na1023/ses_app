@@ -15,21 +15,6 @@ function currentYm(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function Row({ label, min, yen, color }: { label: string; min: number; yen: number; color?: string }) {
-  const h = Math.floor(min / 60);
-  const m = Math.round(min % 60);
-  const t = min > 0 ? (m === 0 ? `${h}時間` : `${h}時間${m}分`) : "0";
-  return (
-    <div className="flex items-center justify-between">
-      <span style={{ color: "var(--muted)" }}>{label}</span>
-      <span>
-        <span style={{ color: "var(--subtle)" }}>{t}</span>{" "}
-        <b style={{ color: color ?? "var(--text)" }}>¥{Math.round(yen).toLocaleString()}</b>
-      </span>
-    </div>
-  );
-}
-
 const STATE_META: Record<string, { label: string; color: string }> = {
   ok: { label: "適正", color: "#10b981" },
   short: { label: "不足", color: "#ef4444" },
@@ -82,12 +67,12 @@ export default async function SettlementPage({
       <AppHeader title="精算・稼働" subtitle="案件ごとの過不足と月間稼働" email={user?.email} />
 
       <div className="px-4 pt-4">
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1">
-            <MonthNav ym={ym} />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0 flex-1"><MonthNav ym={ym} /></div>
+          <div className="flex shrink-0 gap-2">
+            <PeriodPicker startInit={customStart} endInit={customEnd} />
+            {shareData ? <ShareButton data={shareData} /> : null}
           </div>
-          <PeriodPicker startInit={customStart} endInit={customEnd} />
-          {shareData ? <ShareButton data={shareData} /> : null}
         </div>
         {data ? (
           <>
@@ -160,21 +145,55 @@ export default async function SettlementPage({
             {/* 残業代（自社定時基準・1分単位） */}
             {data.hourly > 0 ? (
               <>
-                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（概算）</h2>
+                <h2 className="mb-2 mt-6 text-sm font-bold" style={{ color: "var(--muted)" }}>残業代（法律に基づく概算）</h2>
                 <div className="card">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm" style={{ color: "var(--subtle)" }}>時給（月平均所定より）</span>
-                    <span className="font-bold">¥{Math.round(data.hourly).toLocaleString()}/h</span>
+                    <span className="text-sm" style={{ color: "var(--subtle)" }}>時給（基本給 ÷ 月平均所定労働時間）</span>
+                    <span className="font-bold shrink-0">¥{Math.round(data.hourly).toLocaleString()}/h</span>
                   </div>
-                  <div className="mt-2 space-y-1 border-t pt-2 text-sm" style={{ borderColor: "var(--border)" }}>
-                    <Row label="法定内残業（100%）" min={data.pay.innerOtMin} yen={data.pay.innerPay} />
-                    <Row label="法定外残業（125%）" min={data.pay.outerOtMin} yen={data.pay.outerPay} color="#f59e0b" />
-                    <Row label="深夜割増（+25%）" min={data.pay.nightMin} yen={data.pay.nightPay} color="#6366f1" />
-                    <div className="flex items-center justify-between border-t pt-1.5 font-bold" style={{ borderColor: "var(--border)" }}>
-                      <span>残業代合計</span>
-                      <span style={{ color: "#10b981" }}>¥{Math.round(data.pay.total).toLocaleString()}</span>
+
+                  {/* 残業区分の内訳（各種類を必ず表示） */}
+                  <div className="mt-3 grid grid-cols-1 gap-2">
+                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                        <span>① 法定内残業（100%）</span>
+                        <span>自社の所定 → 8時間まで</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-sm">{data.pay.innerOtMin > 0 ? hm(data.pay.innerOtMin / 60) : "0"}</span>
+                        <b>¥{Math.round(data.pay.innerPay).toLocaleString()}</b>
+                      </div>
+                    </div>
+                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                        <span>② 法定外残業（125%）</span>
+                        <span>1日8時間超</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-sm">{data.pay.outerOtMin > 0 ? hm(data.pay.outerOtMin / 60) : "0"}</span>
+                        <b style={{ color: data.pay.outerOtMin > 0 ? "#f59e0b" : undefined }}>¥{Math.round(data.pay.outerPay).toLocaleString()}</b>
+                      </div>
+                    </div>
+                    <div className="rounded-xl px-3 py-2" style={{ background: "var(--surface-2)" }}>
+                      <div className="flex items-center justify-between text-xs" style={{ color: "var(--subtle)" }}>
+                        <span>③ 深夜割増（+25%）</span>
+                        <span>22:00〜翌5:00</span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between">
+                        <span className="text-sm">{data.pay.nightMin > 0 ? hm(data.pay.nightMin / 60) : "0"}</span>
+                        <b style={{ color: data.pay.nightMin > 0 ? "#6366f1" : undefined }}>¥{Math.round(data.pay.nightPay).toLocaleString()}</b>
+                      </div>
                     </div>
                   </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t pt-2 font-bold" style={{ borderColor: "var(--border)" }}>
+                    <span>残業代合計</span>
+                    <span className="text-lg" style={{ color: "#10b981" }}>¥{Math.round(data.pay.total).toLocaleString()}</span>
+                  </div>
+                  <p className="mt-2 text-xs" style={{ color: "var(--subtle)" }}>
+                    ※ 労基法の割増率に基づき、自社の所定労働時間（設定）を基準に算出。案件先の就業時間は「就業時間超過」の判定にのみ使用します。
+                    法定外×深夜は 125%+25% = 150% になります。
+                  </p>
                 </div>
               </>
             ) : (

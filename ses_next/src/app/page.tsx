@@ -125,7 +125,7 @@ export default async function HomePage() {
               <div className="mt-1 flex items-center justify-between">
                 <div className="text-2xl font-extrabold" style={{ color: level.color }}>{level.emoji} {level.label}</div>
                 <div className="text-right text-xs" style={{ color: "var(--muted)" }}>
-                  残業 {overtime.toFixed(1)}h<br />最大連続 {maxRun}日
+                  残業 {overtime.toFixed(2)}h<br />最大連続 {maxRun}日
                 </div>
               </div>
             </div>
@@ -147,9 +147,9 @@ export default async function HomePage() {
 
             {/* メトリクス */}
             <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="metric"><div className="metric-label">今月の総勤務</div><div className="metric-value">{(settlement?.totalWorked ?? 0).toFixed(1)}<span className="metric-unit">h</span></div><div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(settlement?.totalWorked ?? 0)}）</div></div>
+              <div className="metric"><div className="metric-label">今月の総勤務</div><div className="metric-value">{(settlement?.totalWorked ?? 0).toFixed(2)}<span className="metric-unit">h</span></div><div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(settlement?.totalWorked ?? 0)}）</div></div>
               <div className="metric"><div className="metric-label">勤務日数</div><div className="metric-value">{settlement?.workDays ?? 0}<span className="metric-unit">日</span></div></div>
-              <div className="metric"><div className="metric-label">今月の残業</div><div className="metric-value" style={{ color: overtime > 0 ? "#f59e0b" : undefined }}>{overtime.toFixed(1)}<span className="metric-unit">h</span></div></div>
+              <div className="metric"><div className="metric-label">今月の残業</div><div className="metric-value" style={{ color: overtime > 0 ? "#f59e0b" : undefined }}>{overtime.toFixed(2)}<span className="metric-unit">h</span></div></div>
               <div className="metric"><div className="metric-label">有給残</div><div className="metric-value" style={{ color: leaveRemain <= 3 ? "#f59e0b" : "#10b981" }}>{leaveRemain.toFixed(1)}<span className="metric-unit">日</span></div></div>
             </div>
 

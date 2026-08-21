@@ -14,23 +14,17 @@ export default function MonthNav({ ym, base = "/settlement" }: { ym: string; bas
   const [y, m] = ym.split("-");
 
   return (
-    <div className="flex items-center justify-center gap-3">
-      <button className="btn-ghost" onClick={() => go(shift(ym, -1))}>
-        ‹
-      </button>
+    <div className="flex min-w-0 items-center justify-center gap-2">
+      <button className="btn-ghost shrink-0" onClick={() => go(shift(ym, -1))}>‹</button>
       <input
         type="month"
         className="field text-center"
-        style={{ width: "auto" }}
+        style={{ maxWidth: 150, minWidth: 0 }}
         value={ym}
         onChange={(e) => e.target.value && go(e.target.value)}
       />
-      <span className="text-sm font-bold" style={{ minWidth: 72, textAlign: "center" }}>
-        {y}年{Number(m)}月
-      </span>
-      <button className="btn-ghost" onClick={() => go(shift(ym, 1))}>
-        ›
-      </button>
+      <span className="shrink-0 text-sm font-bold" style={{ textAlign: "center" }}>{y}/{Number(m)}</span>
+      <button className="btn-ghost shrink-0" onClick={() => go(shift(ym, 1))}>›</button>
     </div>
   );
 }

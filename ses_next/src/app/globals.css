@@ -39,7 +39,11 @@ body {
   color: var(--text);
   -webkit-tap-highlight-color: transparent;
   font-feature-settings: "palt";
+  overflow-x: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
+main { max-width: 100vw; overflow-x: hidden; }
 
 * {
   box-sizing: border-box;
@@ -140,11 +144,15 @@ body {
   font-weight: 600;
 }
 .metric-value {
-  font-size: 1.5rem;
+  font-size: 1.35rem;
   font-weight: 800;
-  line-height: 1.1;
+  line-height: 1.15;
   margin-top: 0.15rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+@media (min-width: 420px) { .metric-value { font-size: 1.5rem; } }
 .metric-unit {
   font-size: 0.8rem;
   color: var(--muted);
