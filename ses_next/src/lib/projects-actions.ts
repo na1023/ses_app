@@ -14,8 +14,8 @@ import {
   parseSessions,
   OVERTIME_BASE_HOURS,
 } from "./constants";
-import { getSettings } from "./settings-actions";
-import { hourlyWage } from "./settings";
+import { getSettings, getAutoBaseSalary } from "./settings-actions";
+import { hourlyWageOf, standardMinutesOf } from "./settings";
 import { periodOf, inPeriod, ymdOf } from "./period";
 import { computeDayPay, emptyTotals, addDayToTotals, PayTotals } from "./payroll";
 
@@ -142,6 +142,8 @@ export type SettlementResult = {
   periodLabel: string; // 集計期間の表示（締め日対応）
   pay: PayTotals; // 残業代（法定内/法定外/深夜）
   hourly: number; // 時給（円/時）
+  closingType: "month_end" | "day_15";
+  baseSalary: number;
 };
 
 function parseDate(s: string): Date | null {
@@ -164,14 +166,15 @@ async function getHolidaySet(): Promise<Set<string>> {
   }
 }
 
-export async function getSettlement(ym: string): Promise<SettlementResult> {
+export async function getSettlement(ym: string, override?: { closing_type?: "month_end" | "day_15" }): Promise<SettlementResult> {
   const sb = createClient();
-  const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays, settings] = await Promise.all([
+  const [{ data: projData }, { data: dailyData }, { data: noteData }, holidays, settingsRaw, baseSalary] = await Promise.all([
     sb.from("projects").select("*"),
     sb.from("daily_reports").select("*"),
     sb.from("settlement_notes").select("project_id, reason").eq("year_month", ym),
     getHolidaySet(),
     getSettings(),
+    getAutoBaseSalary(),
   ]);
   const projects = (projData ?? []) as Project[];
   const daily = (dailyData ?? []) as DailyReport[];
@@ -181,7 +184,8 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   });
 
   const [yy] = ym.split("-").map(Number);
-  // 締め日ベースの集計期間
+  // 締め日ベースの集計期間（override で一時切替）
+  const settings = override?.closing_type ? { ...settingsRaw, closing_type: override.closing_type } : settingsRaw;
   const period = periodOf(ym, settings);
   const monthStart = period.start;
   const monthEnd = period.end;
@@ -189,8 +193,8 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
   today.setHours(0, 0, 0, 0);
 
   const monthComplete = today > monthEnd;
-  const wage = hourlyWage(settings);
-  const stdMin = settings.standard_minutes;
+  const wage = hourlyWageOf(settings, baseSalary);
+  const stdMin = standardMinutesOf(settings);
 
   const ymdStr = (d: Date) => ymdOf(d);
 
@@ -383,7 +387,7 @@ export async function getSettlement(ym: string): Promise<SettlementResult> {
       return { start: w.start, end: ymdStr(sun), hours: w.hoursMin / 60, ot: w.otMin / 60, days: w.days.size };
     });
 
-  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage };
+  return { ym, rows, totalWorked, workDays, overtime, scheduleOver, annualOvertime, monthComplete, warnings, weeks, periodLabel: period.label, pay, hourly: wage, closingType: settings.closing_type, baseSalary };
 }
 
 /** 精算の理由メモを保存（月×案件ごと） */

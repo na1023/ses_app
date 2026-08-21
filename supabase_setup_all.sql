@@ -42,10 +42,14 @@ create table if not exists settlement_notes (
 );
 create table if not exists user_settings (
   user_id uuid primary key references auth.users(id) on delete cascade,
-  closing_type text default 'month_end', standard_minutes text default '480',
-  annual_work_days text default '240', base_salary text default '0',
-  fixed_allowance text default '0', updated_at text default ''
+  closing_type text default 'month_end',
+  work_start text default '09:00', work_end text default '18:00', work_break text default '01:00',
+  annual_work_days text default '240',
+  updated_at text default ''
 );
+alter table user_settings add column if not exists work_start text default '09:00';
+alter table user_settings add column if not exists work_end   text default '18:00';
+alter table user_settings add column if not exists work_break text default '01:00';
 alter table user_settings enable row level security;
 drop policy if exists "own_all" on user_settings;
 create policy "own_all" on user_settings using (auth.uid() = user_id) with check (auth.uid() = user_id);

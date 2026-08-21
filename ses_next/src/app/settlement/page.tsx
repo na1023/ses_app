@@ -5,6 +5,7 @@ import AppHeader from "@/components/AppHeader";
 import MonthNav from "./MonthNav";
 import ReasonEditor from "./ReasonEditor";
 import ShareButton, { ShareData } from "./ShareButton";
+import ClosingSwitch from "./ClosingSwitch";
 
 export const dynamic = "force-dynamic";
 
@@ -84,7 +85,10 @@ export default async function SettlementPage({
           {shareData ? <ShareButton data={shareData} /> : null}
         </div>
         {data ? (
-          <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
+          <>
+            <div className="mt-2"><ClosingSwitch current={data.closingType} /></div>
+            <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
+          </>
         ) : null}
 
         {loadError ? (
@@ -197,7 +201,7 @@ export default async function SettlementPage({
               </>
             ) : (
               <div className="mt-6 card text-xs" style={{ color: "var(--subtle)" }}>
-                残業代を計算するには「設定」で自社の定時・月額基本給・年間所定労働日数を入力してください。
+                残業代を表示するには「設定」で自社の定時を設定し、「給与管理」から直近月の基本給を登録してください。
               </div>
             )}
 
