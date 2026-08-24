@@ -129,7 +129,13 @@ export type SettlementRow = {
 export type LawWarning = { level: "danger" | "warn" | "info"; text: string };
 
 export type WeekSummary = { start: string; end: string; hours: number; ot: number; days: number };
-export type DayEntry = { date: string; company: string; project: string; att: string; site: number; office: number; total: number; ot: number };
+export type DayEntry = {
+  date: string; company: string; project: string; att: string;
+  site: number; office: number; total: number; ot: number;
+  start: string; end: string; brk: string;
+  officeStart: string; officeEnd: string;
+  lateEarly: number; content: string; remarks: string;
+};
 
 export type SettlementResult = {
   ym: string;
@@ -257,7 +263,13 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
     const officeMin = officeMinOf(d);
     const dayMin = siteMin + officeMin;
     const dayOt = dayMin > LEGAL_MIN ? dayMin - LEGAL_MIN : 0;
-    days.push({ date: String(d.date), company: d.company || "", project: d.project_name || "", att: d.attendance_type || "", site: siteMin / 60, office: officeMin / 60, total: dayMin / 60, ot: dayOt / 60 });
+    days.push({
+      date: String(d.date), company: d.company || "", project: d.project_name || "", att: d.attendance_type || "",
+      site: siteMin / 60, office: officeMin / 60, total: dayMin / 60, ot: dayOt / 60,
+      start: d.start_time || "", end: d.end_time || "", brk: d.break_time || "",
+      officeStart: d.return_office_start || "", officeEnd: d.return_office_end || "",
+      lateEarly: parseNum(d.late_early_time) ?? 0, content: d.work_content || "", remarks: d.remarks || "",
+    });
     totalMin += dayMin;
     if (dayMin > LEGAL_MIN) overtimeMin += dayMin - LEGAL_MIN;
     const sched = schedByProject.get(`${d.company}||${d.project_name}`) ?? null;

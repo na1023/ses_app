@@ -257,7 +257,7 @@ export default async function SettlementPage({
                                 r.pace === "behind" ? "このままだと不足ペース" : r.pace === "overpace" ? "上限超過ペース" : "順調（足りるペース）";
                               return (
                                 <div className="mt-1 text-xs" style={{ color: pc }}>
-                                  現在ペース：月末見込み <b>{r.projected.toFixed(0)}h</b> → {label}
+                                  現在ペース：{data.closingType === "day_15" ? "締め日(15日)見込み" : "月末見込み"} <b>{r.projected.toFixed(0)}h</b> → {label}
                                 </div>
                               );
                             })()
