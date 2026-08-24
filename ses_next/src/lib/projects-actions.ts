@@ -327,21 +327,21 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
     else if (max !== null && worked > max) { excess = worked - max; state = "over"; }
     else if (min !== null || max !== null) state = "ok";
 
-    // 現在ペースの月末見込み（案件ごとの稼働曜日・祝日設定で経過割合を算出）
+    // 現在ペースの月末見込み
+    //   仕組み: 「これまでに実際働いた日の平均時間」を「残りの稼働予定日」に掛けて加算
+    //   → 休んだ日があっても、実働日ペースで残日数分を予測できる
     const wdset = projectWorkDays(p);
     const holWork = worksOnHolidays(p);
-    let pTot = 0;
-    let pEl = 0;
+    let remainWorkdays = 0; // 今日より後の稼働予定日数（案件の稼働曜日ベース）
     for (let dt = new Date(monthStart); dt <= monthEnd; dt.setDate(dt.getDate() + 1)) {
-      if (end && dt > end) break; // 終了日以降は数えない
+      if (end && dt > end) break; // 案件終了日以降は数えない
+      if (dt <= today) continue; // 今日以前は「実績」があるので予測不要
       const wd = dt.getDay();
       const isWorkday = wdset.has(wd) && (holWork || !holidays.has(ymdStr(dt)));
-      if (isWorkday) {
-        pTot++;
-        if (dt <= today) pEl++;
-      }
+      if (isWorkday) remainWorkdays++;
     }
-    const projElapsed = monthComplete ? 1 : today < monthStart ? 0 : pTot > 0 ? Math.min(1, pEl / pTot) : 0;
+    const workedDays = days.length; // 実際に働いた日数（この案件で日報がある日）
+    const avgHours = workedDays > 0 ? worked / workedDays : 0;
 
     const projectComplete = monthComplete || (end !== null && end <= today);
     let projected: number | null = null;
@@ -350,8 +350,9 @@ export async function getSettlement(ym: string, override?: { closing_type?: "mon
       if (projectComplete) {
         projected = worked;
         pace = "done";
-      } else if (projElapsed > 0) {
-        projected = worked / projElapsed;
+      } else {
+        // 月末見込み ＝ 実績 ＋ 残り稼働日 × 1日平均
+        projected = worked + remainWorkdays * avgHours;
         if (max !== null && projected > max) pace = "overpace";
         else if (min !== null && projected < min) pace = "behind";
         else pace = "ontrack";
