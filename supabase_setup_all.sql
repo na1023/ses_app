@@ -70,6 +70,9 @@ alter table daily_reports  add column if not exists work_sessions text default '
 alter table salary_records add column if not exists deduction_amount text default '0';
 alter table salary_records add column if not exists salary_type      text default '給与';
 alter table salary_records add column if not exists tax_adjustment   text default '0';
+alter table salary_records add column if not exists overtime_inner_pay text default '0';
+alter table salary_records add column if not exists overtime_outer_pay text default '0';
+alter table salary_records add column if not exists overtime_night_pay text default '0';
 
 -- ---------- user_id + RLS ----------
 alter table daily_reports   add column if not exists user_id uuid references auth.users(id) on delete cascade;
