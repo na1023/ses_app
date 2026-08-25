@@ -7,6 +7,7 @@ import ReasonEditor from "./ReasonEditor";
 import ShareButton, { ShareData } from "./ShareButton";
 import ClosingSwitch from "./ClosingSwitch";
 import PeriodPicker from "./PeriodPicker";
+import MonthMemory from "./MonthMemory";
 
 export const dynamic = "force-dynamic";
 
@@ -67,7 +68,7 @@ export default async function SettlementPage({
 
       <div className="px-4 pt-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1"><MonthNav ym={ym} /></div>
+          <div className="min-w-0 flex-1"><MonthNav ym={ym} /><MonthMemory ym={ym} /></div>
           <div className="flex shrink-0 gap-2">
             <PeriodPicker startInit={customStart} endInit={customEnd} />
             {shareData ? <ShareButton data={shareData} /> : null}
