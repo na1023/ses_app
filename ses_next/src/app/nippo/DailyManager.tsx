@@ -15,6 +15,7 @@ import {
   sessionsHours,
   parseSessions,
   hoursLabel,
+  hm,
 } from "@/lib/constants";
 import { createDaily, updateDaily, deleteDaily, DailyInput } from "@/lib/actions";
 import TimeInput from "@/components/TimeInput";
@@ -437,10 +438,12 @@ function Fields({
   const projOptions = active.filter((p) => p.company === f.company).map((p) => p.project_name);
 
   const breakH = (hhmmToMin(f.breakTime || "") ?? 0) / 60;
-  const siteH = needsTime
-    ? Math.max(0, sessionsHours(f.sessions.filter((s) => s.start && s.end)) - breakH)
-    : 0;
+  // 出退勤の合計時間（休憩前）
+  const validSessions = f.sessions.filter((s) => hhmmToMin(s.start) !== null && hhmmToMin(s.end) !== null);
+  const totalSessionsH = needsTime ? sessionsHours(validSessions) : 0;
+  const siteH = needsTime ? Math.max(0, totalSessionsH - breakH) : 0;
   const officeH = f.isReturn ? calcWorkHours(f.returnStart, f.returnEnd, "00:00") : 0;
+  const anyInvalid = f.sessions.some((s) => s.start || s.end).valueOf() && validSessions.length < f.sessions.filter((s) => s.start || s.end).length;
 
   return (
     <div className="card space-y-4">
@@ -537,8 +540,15 @@ function Fields({
           </div>
 
           <div className="rounded-xl px-3 py-2 text-sm" style={{ background: "#0c1a2e", color: "#60a5fa" }}>
-            実働（自動）: <b>{hoursLabel(siteH)}h</b>
-            {f.isReturn ? <> ＋ 帰社 <b>{officeH.toFixed(2)}h</b> ＝ <b>{hoursLabel(siteH + officeH)}h</b></> : null}
+            <div>
+              勤務時間 {totalSessionsH.toFixed(2)}h − 休憩 {breakH.toFixed(2)}h = <b>実働 {siteH.toFixed(2)}h（{hm(siteH)}）</b>
+            </div>
+            {f.isReturn ? (
+              <div className="mt-1">＋ 帰社 {officeH.toFixed(2)}h ＝ <b>合計 {(siteH + officeH).toFixed(2)}h（{hm(siteH + officeH)}）</b></div>
+            ) : null}
+            {anyInvalid ? (
+              <div className="mt-1 text-xs" style={{ color: "#fbbf24" }}>⚠ 時刻の形式が正しくないセッションがあります（HH:MM で入力）</div>
+            ) : null}
           </div>
 
           {/* 帰社日 */}
