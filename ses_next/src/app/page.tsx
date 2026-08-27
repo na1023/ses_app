@@ -4,6 +4,8 @@ import { getSettlement } from "@/lib/projects-actions";
 import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
 import { countsAsWork, monthWorkLevel, parseNum, hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
+import AuthRetry from "@/components/AuthRetry";
+import { isAuthClockError } from "@/lib/auth-error";
 
 export const dynamic = "force-dynamic";
 
@@ -110,7 +112,11 @@ export default async function HomePage() {
       <AppHeader title="ホーム" subtitle={`${now.getMonth() + 1}月のサマリー`} email={user?.email} />
       <div className="px-4 pt-4">
         {err ? (
-          <div className="card text-sm" style={{ color: "#f87171" }}>読み込みエラー: {err}</div>
+          isAuthClockError(err) ? (
+            <AuthRetry message={err} />
+          ) : (
+            <div className="card text-sm" style={{ color: "#f87171" }}>読み込みエラー: {err}</div>
+          )
         ) : (
           <>
             {/* 今月のワークバランス */}

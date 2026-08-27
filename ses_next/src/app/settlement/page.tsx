@@ -8,6 +8,8 @@ import ShareButton, { ShareData } from "./ShareButton";
 import ClosingSwitch from "./ClosingSwitch";
 import PeriodPicker from "./PeriodPicker";
 import MonthMemory from "./MonthMemory";
+import AuthRetry from "@/components/AuthRetry";
+import { isAuthClockError } from "@/lib/auth-error";
 
 export const dynamic = "force-dynamic";
 
@@ -82,9 +84,13 @@ export default async function SettlementPage({
         ) : null}
 
         {loadError ? (
-          <div className="mt-4 card text-sm" style={{ color: "#f87171" }}>
-            読み込みエラー: {loadError}
-          </div>
+          isAuthClockError(loadError) ? (
+            <AuthRetry message={loadError} />
+          ) : (
+            <div className="mt-4 card text-sm" style={{ color: "#f87171" }}>
+              読み込みエラー: {loadError}
+            </div>
+          )
         ) : data ? (
           <>
             {/* 労働基準法 警告 */}

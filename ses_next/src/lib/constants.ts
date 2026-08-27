@@ -213,13 +213,13 @@ export const ATT_COLOR: Record<string, string> = {
   その他: "#64748b",
 };
 
-/** HH:MM 文字列を分に変換（不正なら null） */
+/** HH:MM 文字列を分に変換（不正なら null）。24〜47時台も許容し翌日跨ぎに対応。 */
 export function hhmmToMin(t: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec((t ?? "").trim());
   if (!m) return null;
   const h = parseInt(m[1], 10);
   const mm = parseInt(m[2], 10);
-  if (h < 0 || h > 23 || mm < 0 || mm > 59) return null;
+  if (h < 0 || h > 47 || mm < 0 || mm > 59) return null;
   return h * 60 + mm;
 }
 

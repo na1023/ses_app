@@ -23,13 +23,21 @@ const LEGAL_MINUTES = 480; // 8時間
 const NIGHT_START = 22 * 60; // 1320
 const NIGHT_END = 5 * 60; // 300（翌日側）
 
-/** 1セッション [start,end] が深夜帯(22:00-24:00 / 0:00-5:00)に重なる分数 */
+/**
+ * 1セッション [start,end] が深夜帯に重なる分数。
+ * 深夜帯：当日 22:00-24:00 / 翌日 0:00-5:00 / 翌日 22:00-24:00 (万一の連続跨ぎ)
+ * endMin が 24 時間を超える表記（例: 24:45=1485）にも対応。
+ */
 function nightMinutesOfSession(startMin: number, endMin: number): number {
   let n = 0;
-  // 0:00〜5:00
+  // 当日 0:00〜5:00
   n += Math.max(0, Math.min(endMin, NIGHT_END) - Math.max(startMin, 0));
-  // 22:00〜24:00
+  // 当日 22:00〜24:00
   n += Math.max(0, Math.min(endMin, 24 * 60) - Math.max(startMin, NIGHT_START));
+  // 翌日 0:00〜5:00 (24:00〜29:00)
+  n += Math.max(0, Math.min(endMin, 24 * 60 + NIGHT_END) - Math.max(startMin, 24 * 60));
+  // 翌日 22:00〜24:00 (46:00〜48:00) — 通常は使わないが安全のため
+  n += Math.max(0, Math.min(endMin, 48 * 60) - Math.max(startMin, 24 * 60 + NIGHT_START));
   return n;
 }
 
