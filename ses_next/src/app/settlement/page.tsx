@@ -69,18 +69,23 @@ export default async function SettlementPage({
       <AppHeader title="精算・稼働" subtitle="案件ごとの過不足と月間稼働" email={user?.email} />
 
       <div className="px-4 pt-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0 flex-1"><MonthNav ym={ym} /><MonthMemory ym={ym} /></div>
-          <div className="flex shrink-0 gap-2">
-            <PeriodPicker startInit={customStart} endInit={customEnd} />
-            {shareData ? <ShareButton data={shareData} /> : null}
-          </div>
+        {/* 1行目：大きな月ナビ */}
+        <div className="card" style={{ padding: "0.5rem 0.75rem" }}>
+          <MonthNav ym={ym} /><MonthMemory ym={ym} />
         </div>
+
+        {/* 2行目：締め日 + アクション（期間指定・共有） */}
         {data ? (
-          <>
-            <div className="mt-2"><ClosingSwitch current={data.closingType} /></div>
-            <p className="mt-1 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
-          </>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1"><ClosingSwitch current={data.closingType} /></div>
+            <div className="flex shrink-0 gap-1.5">
+              <PeriodPicker startInit={customStart} endInit={customEnd} />
+              {shareData ? <ShareButton data={shareData} /> : null}
+            </div>
+          </div>
+        ) : null}
+        {data ? (
+          <p className="mt-1.5 text-center text-xs" style={{ color: "var(--subtle)" }}>集計期間：{data.periodLabel}</p>
         ) : null}
 
         {loadError ? (

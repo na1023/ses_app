@@ -48,16 +48,19 @@ export default function BottomNav() {
     >
       <ul className="flex">
         {ITEMS.map((it) => {
-          const active = pathname === it.href || pathname.startsWith(it.href + "/");
+          const active = pathname === it.href || (it.href !== "/" && pathname.startsWith(it.href + "/")) || (it.href === "/nippo" && pathname === "/nippo") || (it.href === "/" && pathname === "/");
           return (
             <li key={it.href} className="flex-1">
               <Link
                 href={it.href}
-                className="flex flex-col items-center gap-1 py-3.5 text-xs font-semibold"
+                prefetch
+                onClick={() => navigator.vibrate?.(10)}
+                className="nav-tap flex flex-col items-center gap-1 py-3.5 text-xs font-semibold"
                 style={{ color: active ? "var(--accent)" : "var(--subtle)" }}
               >
-                <span className="text-lg leading-none">{it.icon}</span>
+                <span className="text-lg leading-none" style={{ transform: active ? "scale(1.1)" : "scale(1)", transition: "transform 0.12s" }}>{it.icon}</span>
                 {it.label}
+                {active ? <span style={{ position: "absolute", bottom: 4, width: 24, height: 3, background: "var(--accent)", borderRadius: 2 }} /> : null}
               </Link>
             </li>
           );
