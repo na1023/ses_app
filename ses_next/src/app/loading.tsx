@@ -1,10 +1,2 @@
-export default function Loading() {
-  return (
-    <div className="flex items-center justify-center py-24">
-      <div
-        className="h-8 w-8 animate-spin rounded-full border-2"
-        style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }}
-      />
-    </div>
-  );
-}
+import PageLoading from "@/components/PageLoading";
+export default function Loading() { return <PageLoading title="読み込み中" />; }
