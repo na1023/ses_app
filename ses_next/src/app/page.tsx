@@ -2,9 +2,10 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/actions";
 import { getSettlement } from "@/lib/projects-actions";
 import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
-import { countsAsWork, monthWorkLevel, parseNum, hm } from "@/lib/constants";
+import { countsAsWork, parseNum, hm } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import AuthRetry from "@/components/AuthRetry";
+import WorkBalanceCard from "@/components/WorkBalanceCard";
 import { isAuthClockError } from "@/lib/auth-error";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +63,6 @@ export default async function HomePage() {
   });
 
   const overtime = settlement?.overtime ?? 0;
-  const level = monthWorkLevel(overtime, maxRun);
 
   // 未記入（平日で日報が無い日）
   const today = new Date();
@@ -120,15 +120,7 @@ export default async function HomePage() {
         ) : (
           <>
             {/* 今月のワークバランス */}
-            <div className="card" style={{ background: level.color + "12", borderColor: level.color }}>
-              <div className="text-xs" style={{ color: "var(--subtle)" }}>今月のワークバランス</div>
-              <div className="mt-1 flex items-center justify-between">
-                <div className="text-2xl font-extrabold" style={{ color: level.color }}>{level.emoji} {level.label}</div>
-                <div className="text-right text-xs" style={{ color: "var(--muted)" }}>
-                  残業 {overtime.toFixed(2)}h<br />最大連続 {maxRun}日
-                </div>
-              </div>
-            </div>
+            <WorkBalanceCard overtime={overtime} maxRun={maxRun} />
 
             {/* 通知 */}
             {notes.length > 0 ? (
