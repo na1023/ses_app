@@ -9,6 +9,7 @@ import ClosingSwitch from "./ClosingSwitch";
 import PeriodPicker from "./PeriodPicker";
 import MonthMemory from "./MonthMemory";
 import AuthRetry from "@/components/AuthRetry";
+import WorkBalanceCard from "@/components/WorkBalanceCard";
 import { isAuthClockError } from "@/lib/auth-error";
 
 export const dynamic = "force-dynamic";
@@ -114,6 +115,21 @@ export default async function SettlementPage({
                 })}
               </div>
             ) : null}
+
+            {/* 今月のワークバランス（期間内の残業と連続勤務日数から判定） */}
+            {(() => {
+              const dsAll = Array.from(new Set(data.days.map((d) => d.date))).sort();
+              let run = 0, maxRun = 0;
+              let prev: Date | null = null;
+              dsAll.forEach((ds) => {
+                const cur = new Date(ds);
+                if (prev && cur.getTime() - prev.getTime() === 86400000) run += 1;
+                else run = 1;
+                maxRun = Math.max(maxRun, run);
+                prev = cur;
+              });
+              return <div className="mt-4"><WorkBalanceCard overtime={data.overtime} maxRun={maxRun} label="この期間のワークバランス" /></div>;
+            })()}
 
             {/* 月間サマリー */}
             <div className="mt-4 grid grid-cols-2 gap-2">

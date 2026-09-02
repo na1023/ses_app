@@ -1,12 +1,10 @@
 import { listRecentDaily, getCurrentUser } from "@/lib/actions";
 import { listProjects } from "@/lib/projects-actions";
-import { getSettlement } from "@/lib/projects-actions";
-import { Project, countsAsWork } from "@/lib/constants";
+import { Project } from "@/lib/constants";
 import { isAuthClockError } from "@/lib/auth-error";
 import DailyManager from "./DailyManager";
 import AppHeader from "@/components/AppHeader";
 import AuthRetry from "@/components/AuthRetry";
-import WorkBalanceCard from "@/components/WorkBalanceCard";
 
 export const dynamic = "force-dynamic";
 
@@ -26,35 +24,17 @@ export default async function NippoPage() {
   let reports: Awaited<ReturnType<typeof listRecentDaily>> = [];
   let projects: Project[] = [];
   let holidays: Record<string, string> = {};
-  let settlement: Awaited<ReturnType<typeof getSettlement>> | null = null;
   let loadError = "";
   const user = await getCurrentUser();
-  const now = new Date();
-  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   try {
-    [reports, projects, holidays, settlement] = await Promise.all([
+    [reports, projects, holidays] = await Promise.all([
       listRecentDaily(60),
       listProjects(),
       getHolidays(),
-      getSettlement(ym),
     ]);
   } catch (e) {
     loadError = e instanceof Error ? e.message : String(e);
   }
-
-  // 連続勤務日数（今月）— ワークバランス用
-  const monthWork = reports.filter((d) => String(d.date).startsWith(ym) && countsAsWork(d.attendance_type));
-  const dset = Array.from(new Set(monthWork.map((d) => d.date))).sort();
-  let run = 0, maxRun = 0;
-  let prev: Date | null = null;
-  dset.forEach((ds) => {
-    const cur = new Date(ds);
-    if (prev && cur.getTime() - prev.getTime() === 86400000) run += 1;
-    else run = 1;
-    maxRun = Math.max(maxRun, run);
-    prev = cur;
-  });
-  const overtime = settlement?.overtime ?? 0;
 
   return (
     <div>
@@ -69,10 +49,7 @@ export default async function NippoPage() {
             </div>
           )
         ) : (
-          <>
-            <div className="mb-3"><WorkBalanceCard overtime={overtime} maxRun={maxRun} /></div>
-            <DailyManager projects={projects} reports={reports} holidays={holidays} />
-          </>
+          <DailyManager projects={projects} reports={reports} holidays={holidays} />
         )}
       </div>
     </div>

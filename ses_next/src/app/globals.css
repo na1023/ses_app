@@ -245,8 +245,21 @@ main { max-width: 100vw; overflow-x: hidden; }
   transform: scale(0.97);
 }
 
-.nav-tap { position: relative; transition: background 0.08s, transform 0.05s; }
-.nav-tap:active { background: var(--surface-2); transform: scale(0.95); }
+.nav-tap {
+  position: relative;
+  transition: background 0.08s, transform 0.06s, color 0.08s;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-tap:active {
+  background: linear-gradient(180deg, rgba(59,130,246,0.35), rgba(59,130,246,0.12));
+  color: var(--accent) !important;
+  transform: scale(0.90);
+  box-shadow: inset 0 0 0 2px rgba(59,130,246,0.45);
+}
+.nav-tap:active > span:first-child {
+  transform: scale(1.25) !important;
+}
 
 /* ===== セグメント（タブ） ===== */
 .seg {
