@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import {
   ATTENDANCE_OPTIONS,
   ATT_COLOR,
-  LATE_EARLY_TYPES,
   countsAsWork,
+  parseAttendance,
+  hasLateEarly,
   hhmmToMin,
   dayWorkLevel,
   Project,
@@ -219,7 +220,7 @@ export default function DailyManager({
       attendance_type: f.att,
       sessions: f.sessions,
       break_time: f.breakTime,
-      late_early_time: LATE_EARLY_TYPES.has(f.att) ? f.lateEarly : "0",
+      late_early_time: hasLateEarly(f.att) ? f.lateEarly : "0",
       return_office_hours: f.isReturn ? String(Math.round(officeH * 60) / 60) : "0",
       return_office_start: f.isReturn ? f.returnStart : "",
       return_office_end: f.isReturn ? f.returnEnd : "",
@@ -334,7 +335,9 @@ export default function DailyManager({
                       <div className="flex items-center gap-2">
                         <span className="font-bold">{inp.date}</span>
                         <span className="badge" style={{ background: "#3a2a06", color: "#fbbf24" }}>未同期</span>
-                        <span className="text-xs" style={{ color: "var(--subtle)" }}>{inp.attendance_type}</span>
+                        {parseAttendance(inp.attendance_type).map((a) => (
+                          <span key={a} className="badge" style={{ background: (ATT_COLOR[a] ?? "#94a3b8") + "22", color: ATT_COLOR[a] ?? "#94a3b8" }}>{a}</span>
+                        ))}
                       </div>
                       <div className="mt-0.5 text-xs" style={{ color: "var(--subtle)" }}>
                         {[inp.company && `${inp.company}${inp.project_name ? " / " + inp.project_name : ""}`, h > 0 && `実働 ${h.toFixed(2)}h`].filter(Boolean).join("  |  ")}
@@ -368,7 +371,7 @@ export default function DailyManager({
             {filtered.map((r) => {
               const wh = Number(r.work_hours) || 0;
               const dayTotal = wh + (parseFloat(r.return_office_hours || "0") || 0);
-              const color = ATT_COLOR[r.attendance_type] ?? "#94a3b8";
+              const attList = parseAttendance(r.attendance_type);
               const lv = dayWorkLevel(dayTotal);
               return (
                 <li key={r.id} className="card">
@@ -376,7 +379,10 @@ export default function DailyManager({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold">{r.date}</span>
-                        <span className="badge" style={{ background: color + "22", color }}>{r.attendance_type}</span>
+                        {attList.map((a) => {
+                          const c = ATT_COLOR[a] ?? "#94a3b8";
+                          return <span key={a} className="badge" style={{ background: c + "22", color: c }}>{a}</span>;
+                        })}
                         {dayTotal > 0 ? (
                           <span className="badge" style={{ background: lv.color + "22", color: lv.color }}>{lv.emoji} {lv.label}</span>
                         ) : null}
@@ -430,7 +436,8 @@ function Fields({
   dupWarn: boolean;
 }) {
   const needsTime = countsAsWork(f.att);
-  const isLate = LATE_EARLY_TYPES.has(f.att);
+  const isLate = hasLateEarly(f.att);
+  const attArr = parseAttendance(f.att);
   const set = (patch: Partial<FormState>) => setF((p) => ({ ...p, ...patch }));
 
   const active = projects.filter((p) => activeOn(p, f.date));
@@ -456,16 +463,32 @@ function Fields({
         ) : null}
       </div>
 
-      {/* 勤怠区分 */}
+      {/* 勤怠区分（複数選択可） */}
       <div>
-        <label className="label">勤怠区分</label>
+        <label className="label">勤怠区分（複数選択可）</label>
         <div className="flex flex-wrap gap-2">
-          {ATTENDANCE_OPTIONS.map((o) => (
-            <button key={o} type="button" className="chip" data-active={f.att === o}
-              style={f.att === o ? { background: ATT_COLOR[o] } : undefined}
-              onClick={() => set({ att: o })}>{o}</button>
-          ))}
+          {ATTENDANCE_OPTIONS.map((o) => {
+            const on = attArr.includes(o);
+            return (
+              <button
+                key={o}
+                type="button"
+                className="chip"
+                data-active={on}
+                style={on ? { background: ATT_COLOR[o] } : undefined}
+                onClick={() => {
+                  const next = on ? attArr.filter((x) => x !== o) : [...attArr, o];
+                  set({ att: next.join(",") });
+                }}
+              >
+                {o}
+              </button>
+            );
+          })}
         </div>
+        {attArr.length === 0 ? (
+          <p className="mt-1 text-xs" style={{ color: "#fbbf24" }}>⚠ 少なくとも1つ選択してください</p>
+        ) : null}
       </div>
 
       {needsTime ? (
@@ -567,7 +590,7 @@ function Fields({
 
           {isLate ? (
             <div>
-              <label className="label">{f.att}時間 (h)</label>
+              <label className="label">遅刻/早退時間 (h)</label>
               <input type="number" inputMode="decimal" step="0.25" min="0" className="field" value={f.lateEarly} onChange={(e) => set({ lateEarly: e.target.value })} placeholder="例: 1.5" />
             </div>
           ) : null}
@@ -578,7 +601,7 @@ function Fields({
           </div>
         </>
       ) : (
-        <p className="text-sm" style={{ color: "var(--subtle)" }}>「{f.att}」は時刻・業務内容の入力は不要です。必要なら備考のみどうぞ。</p>
+        <p className="text-sm" style={{ color: "var(--subtle)" }}>「{f.att || "未選択"}」は時刻・業務内容の入力は不要です。必要なら備考のみどうぞ。</p>
       )}
 
       <div>

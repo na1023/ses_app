@@ -192,9 +192,19 @@ export const LATE_EARLY_TYPES = new Set(["遅刻", "早退", "遅刻+早退"]);
 // 半休（半日は勤務・半日は有給消化）。時刻入力を出す。
 export const HALF_WORK_TYPES = new Set(["午前半休", "午後半休"]);
 
-/** 稼働時間として集計する区分（通常勤務＋半休）。 */
+/** 勤怠区分（複数）を配列で返す。カンマ区切りに対応。 */
+export function parseAttendance(att: string): string[] {
+  return (att || "").split(",").map((s) => s.trim()).filter(Boolean);
+}
+
+/** 稼働時間として集計する区分（通常勤務＋半休）。複数区分にも対応。 */
 export function countsAsWork(att: string): boolean {
-  return WORK_TYPES.has(att) || HALF_WORK_TYPES.has(att);
+  return parseAttendance(att).some((a) => WORK_TYPES.has(a) || HALF_WORK_TYPES.has(a));
+}
+
+/** いずれかが遅刻/早退か */
+export function hasLateEarly(att: string): boolean {
+  return parseAttendance(att).some((a) => LATE_EARLY_TYPES.has(a));
 }
 
 export const ATT_COLOR: Record<string, string> = {

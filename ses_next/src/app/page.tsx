@@ -3,9 +3,9 @@ import { getCurrentUser } from "@/lib/actions";
 import { getSettlement } from "@/lib/projects-actions";
 import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
 import { countsAsWork, parseNum, hm } from "@/lib/constants";
-import AppHeader from "@/components/AppHeader";
 import AuthRetry from "@/components/AuthRetry";
 import WorkBalanceCard from "@/components/WorkBalanceCard";
+import AccountMenu from "@/components/AccountMenu";
 import { isAuthClockError } from "@/lib/auth-error";
 
 export const dynamic = "force-dynamic";
@@ -107,9 +107,22 @@ export default async function HomePage() {
 
   const cM = (c: string) => ({ background: c + "12", borderColor: c });
 
+  const hour = now.getHours();
+  const greeting = hour < 5 ? "こんばんは" : hour < 11 ? "おはようございます" : hour < 18 ? "こんにちは" : "こんばんは";
+  const todayStr = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日（${["日","月","火","水","木","金","土"][now.getDay()]}）`;
+  const enteredToday = daily.some((d) => d.date === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`);
+
   return (
     <div>
-      <AppHeader title="ホーム" subtitle={`${now.getMonth() + 1}月のサマリー`} email={user?.email} />
+      <header className="app-header px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="text-xs" style={{ color: "var(--subtle)" }}>{todayStr}</div>
+            <h1 className="text-xl font-extrabold">{greeting} 👋</h1>
+          </div>
+          {user?.email ? <AccountMenu email={user.email} /> : null}
+        </div>
+      </header>
       <div className="px-4 pt-4">
         {err ? (
           isAuthClockError(err) ? (
@@ -119,8 +132,27 @@ export default async function HomePage() {
           )
         ) : (
           <>
-            {/* 今月のワークバランス */}
-            <WorkBalanceCard overtime={overtime} maxRun={maxRun} />
+            {/* ヒーロー：今日の日報CTA */}
+            <Link
+              href="/nippo"
+              className="block card card-hover"
+              style={{
+                background: enteredToday
+                  ? "linear-gradient(135deg, rgba(16,185,129,0.18), rgba(16,185,129,0.05))"
+                  : "linear-gradient(135deg, rgba(59,130,246,0.20), rgba(99,102,241,0.10))",
+                borderColor: enteredToday ? "#10b981" : "var(--accent)",
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs" style={{ color: "var(--subtle)" }}>今日の日報</div>
+                  <div className="mt-0.5 text-lg font-bold" style={{ color: enteredToday ? "#10b981" : "var(--accent)" }}>
+                    {enteredToday ? "✅ 記入済み" : "📝 記入する"}
+                  </div>
+                </div>
+                <div className="text-3xl">{enteredToday ? "🎉" : "▸"}</div>
+              </div>
+            </Link>
 
             {/* 通知 */}
             {notes.length > 0 ? (
@@ -137,11 +169,15 @@ export default async function HomePage() {
               </div>
             ) : null}
 
+            {/* 今月のワークバランス */}
+            <div className="mt-3"><WorkBalanceCard overtime={overtime} maxRun={maxRun} /></div>
+
             {/* メトリクス */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <div className="metric"><div className="metric-label">今月の総勤務</div><div className="metric-value">{(settlement?.totalWorked ?? 0).toFixed(2)}<span className="metric-unit">h</span></div><div className="text-xs" style={{ color: "var(--subtle)" }}>（{hm(settlement?.totalWorked ?? 0)}）</div></div>
+            <h2 className="mt-5 mb-2 text-xs font-bold" style={{ color: "var(--subtle)" }}>今月のサマリー</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="metric"><div className="metric-label">総勤務</div><div className="metric-value">{(settlement?.totalWorked ?? 0).toFixed(2)}<span className="metric-unit">h</span></div><div className="text-xs" style={{ color: "var(--subtle)" }}>{hm(settlement?.totalWorked ?? 0)}</div></div>
               <div className="metric"><div className="metric-label">勤務日数</div><div className="metric-value">{settlement?.workDays ?? 0}<span className="metric-unit">日</span></div></div>
-              <div className="metric"><div className="metric-label">今月の残業</div><div className="metric-value" style={{ color: overtime > 0 ? "#f59e0b" : undefined }}>{overtime.toFixed(2)}<span className="metric-unit">h</span></div></div>
+              <div className="metric"><div className="metric-label">残業</div><div className="metric-value" style={{ color: overtime > 0 ? "#f59e0b" : undefined }}>{overtime.toFixed(2)}<span className="metric-unit">h</span></div></div>
               <div className="metric"><div className="metric-label">有給残</div><div className="metric-value" style={{ color: leaveRemain <= 3 ? "#f59e0b" : "#10b981" }}>{leaveRemain.toFixed(1)}<span className="metric-unit">日</span></div></div>
             </div>
 
@@ -149,7 +185,7 @@ export default async function HomePage() {
             {missing.length > 0 ? (
               <Link href="/nippo" className="mt-3 block card card-hover" style={cM("#f59e0b")}>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>未記入の平日 {missing.length}日</span>
+                  <span className="text-sm font-bold" style={{ color: "#f59e0b" }}>📋 未記入の平日 {missing.length}日</span>
                   <span className="text-xs" style={{ color: "var(--subtle)" }}>日報へ ›</span>
                 </div>
                 <div className="mt-1 text-xs" style={{ color: "var(--muted)" }}>{missing.slice(-6).join("  ")}</div>
@@ -157,19 +193,46 @@ export default async function HomePage() {
             ) : null}
 
             {/* 面談 */}
-            <Link href="/interviews" className="mt-3 block card card-hover">
-              <div className="flex items-center justify-between">
-                <span className="metric-label">結果待ちの面談</span>
-                <span className="text-xs" style={{ color: "var(--subtle)" }}>面談へ ›</span>
-              </div>
-              <div className="metric-value">{waitingIv.length}<span className="metric-unit">件</span></div>
-            </Link>
+            {waitingIv.length > 0 ? (
+              <Link href="/interviews" className="mt-3 block card card-hover">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">💼 結果待ちの面談</span>
+                  <span className="text-xs" style={{ color: "var(--subtle)" }}>{waitingIv.length}件 ›</span>
+                </div>
+              </Link>
+            ) : null}
 
             {/* クイックリンク */}
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <Link href="/nippo" className="card card-hover text-center text-sm font-semibold">📝 日報</Link>
-              <Link href="/settlement" className="card card-hover text-center text-sm font-semibold">📊 精算</Link>
-              <Link href="/report" className="card card-hover text-center text-sm font-semibold">📈 レポート</Link>
+            <h2 className="mt-5 mb-2 text-xs font-bold" style={{ color: "var(--subtle)" }}>ショートカット</h2>
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/settlement" className="card card-hover flex items-center gap-3" style={{ padding: "0.9rem" }}>
+                <span className="text-2xl">📊</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold">精算</div>
+                  <div className="text-xs truncate" style={{ color: "var(--subtle)" }}>案件別の過不足</div>
+                </div>
+              </Link>
+              <Link href="/report" className="card card-hover flex items-center gap-3" style={{ padding: "0.9rem" }}>
+                <span className="text-2xl">📈</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold">レポート</div>
+                  <div className="text-xs truncate" style={{ color: "var(--subtle)" }}>月次の集計</div>
+                </div>
+              </Link>
+              <Link href="/projects" className="card card-hover flex items-center gap-3" style={{ padding: "0.9rem" }}>
+                <span className="text-2xl">📁</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold">案件</div>
+                  <div className="text-xs truncate" style={{ color: "var(--subtle)" }}>参画中の管理</div>
+                </div>
+              </Link>
+              <Link href="/salary" className="card card-hover flex items-center gap-3" style={{ padding: "0.9rem" }}>
+                <span className="text-2xl">💰</span>
+                <div className="min-w-0">
+                  <div className="text-sm font-bold">給与</div>
+                  <div className="text-xs truncate" style={{ color: "var(--subtle)" }}>月収の記録</div>
+                </div>
+              </Link>
             </div>
           </>
         )}

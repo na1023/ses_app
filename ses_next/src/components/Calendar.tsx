@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ATT_COLOR } from "@/lib/constants";
+import { ATT_COLOR, parseAttendance } from "@/lib/constants";
 
 const DOW = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -41,7 +41,11 @@ export default function Calendar({
   const monthPrefix = `${view.y}-${String(view.m + 1).padStart(2, "0")}`;
   const filledCount = Object.keys(reported).filter((k) => k.startsWith(monthPrefix)).length;
   const presentTypes = Array.from(
-    new Set(Object.entries(reported).filter(([k]) => k.startsWith(monthPrefix)).map(([, v]) => v))
+    new Set(
+      Object.entries(reported)
+        .filter(([k]) => k.startsWith(monthPrefix))
+        .flatMap(([, v]) => parseAttendance(v))
+    )
   ).filter(Boolean);
 
   return (
@@ -73,11 +77,14 @@ export default function Calendar({
               if (d === null) return <div key={idx} />;
               const ds = `${view.y}-${String(view.m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
               const att = reported[ds];
+              const attArr = parseAttendance(att || "");
+              const first = attArr[0] || "";
               const hol = holidays[ds];
               const dow = new Date(view.y, view.m, d).getDay();
               const isToday = ds === todayStr;
               const dateColor = hol || dow === 0 ? "#f87171" : dow === 6 ? "#60a5fa" : "var(--text)";
-              const attColor = att ? ATT_COLOR[att] ?? "#3b82f6" : "";
+              const attColor = first ? ATT_COLOR[first] ?? "#3b82f6" : "";
+              const label = attArr.length > 1 ? `${first.slice(0, 2)}+` : first.length > 3 ? first.slice(0, 3) : first;
               return (
                 <button
                   key={idx}
@@ -95,7 +102,7 @@ export default function Calendar({
                       className="mt-0.5 rounded px-1 text-[9px] font-bold leading-tight"
                       style={{ background: attColor, color: "#0e1016" }}
                     >
-                      {att.length > 3 ? att.slice(0, 3) : att}
+                      {label}
                     </span>
                   ) : null}
                 </button>
