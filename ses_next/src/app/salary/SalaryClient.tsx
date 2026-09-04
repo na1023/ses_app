@@ -4,7 +4,6 @@ import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   SalaryRecord,
-  INCOME_FIELDS,
   DEDUCTION_FIELDS,
   LEGACY_OVERTIME_FIELD,
   salarySummary,
