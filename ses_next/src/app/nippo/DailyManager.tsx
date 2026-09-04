@@ -287,6 +287,40 @@ export default function DailyManager({
         holidays={holidays}
         onPick={pickDate}
       />
+
+      {/* クイックアクション */}
+      {list.length > 0 ? (
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          <button
+            className="btn-ghost"
+            title="直近の日報の会社・案件・時間をコピー"
+            onClick={() => {
+              const src = list[0];
+              const base = fromReport(src);
+              setForm({ ...base, id: undefined, date: form.date });
+            }}
+          >
+            📋 直近をコピー
+          </button>
+          {list[0]?.date !== form.date ? (
+            <button
+              className="btn-ghost"
+              title="日付だけ今日に"
+              onClick={() => setForm((p) => ({ ...p, date: todayStr() }))}
+            >
+              📅 今日にする
+            </button>
+          ) : null}
+          <button
+            className="btn-ghost"
+            title="フォームをリセット"
+            onClick={() => setForm(emptyForm())}
+          >
+            🔄 リセット
+          </button>
+        </div>
+      ) : null}
+
       <Fields
         f={form}
         setF={setForm}
@@ -298,23 +332,22 @@ export default function DailyManager({
           {msg.text}
         </div>
       ) : null}
-      <div className="mt-3 flex gap-2">
+
+      {/* Sticky 送信バー（下部固定） */}
+      <div
+        className="sticky-submit"
+        style={{
+          position: "sticky",
+          bottom: "calc(env(safe-area-inset-bottom, 0px) + 68px)",
+          zIndex: 30,
+          marginTop: "0.75rem",
+          padding: "0.5rem 0",
+          background: "linear-gradient(180deg, transparent, var(--bg) 40%)",
+        }}
+      >
         <button className="btn-primary" disabled={busy} onClick={submitCreate}>
-          {busy ? "登録中…" : "日報を登録する"}
+          {busy ? "登録中…" : "✓ 日報を登録する"}
         </button>
-        {list.length > 0 ? (
-          <button
-            className="btn-ghost shrink-0"
-            title="直近の日報の会社・案件・時間をコピー"
-            onClick={() => {
-              const src = list[0];
-              const base = fromReport(src);
-              setForm({ ...base, id: undefined, date: form.date });
-            }}
-          >
-            直近をコピー
-          </button>
-        ) : null}
       </div>
 
       {/* 未同期キュー */}
@@ -456,7 +489,7 @@ function Fields({
     <div className="card space-y-4">
       {/* 日付 */}
       <div>
-        <label className="label">日付</label>
+        <label className="label">📅 日付</label>
         <input type="date" className="field" value={f.date} onChange={(e) => set({ date: e.target.value })} />
         {dupWarn ? (
           <p className="mt-1 text-xs" style={{ color: "#f59e0b" }}>⚠ この日付の日報は既に登録されています。</p>
@@ -465,7 +498,7 @@ function Fields({
 
       {/* 勤怠区分（複数選択可） */}
       <div>
-        <label className="label">勤怠区分（複数選択可）</label>
+        <label className="label">🎫 勤怠区分（複数選択可）</label>
         <div className="flex flex-wrap gap-2">
           {ATTENDANCE_OPTIONS.map((o) => {
             const on = attArr.includes(o);
@@ -496,7 +529,7 @@ function Fields({
           {/* 会社・案件（指定日に参画中の案件から） */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">会社名</label>
+              <label className="label">🏢 会社名</label>
               <select className="field" value={f.company} onChange={(e) => set({ company: e.target.value, project: "" })}>
                 <option value="">選択</option>
                 {companies.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -504,7 +537,7 @@ function Fields({
               </select>
             </div>
             <div>
-              <label className="label">案件名</label>
+              <label className="label">📦 案件名</label>
               <select
                 className="field"
                 value={f.project}
@@ -535,7 +568,7 @@ function Fields({
 
           {/* 勤務時間（複数可） */}
           <div>
-            <label className="label">勤務時間（出勤・退勤／間を空けて複数可）</label>
+            <label className="label">⏰ 勤務時間（複数可）</label>
             <div className="space-y-2">
               {f.sessions.map((s, i) => (
                 <div key={i} className="flex items-center gap-2">
@@ -549,11 +582,52 @@ function Fields({
               ))}
               <button className="btn-ghost" onClick={() => set({ sessions: [...f.sessions, { start: "", end: "" }] })}>＋ 時間帯を追加</button>
             </div>
+            {/* 退勤時刻クイックボタン */}
+            {f.sessions.length > 0 && f.sessions[f.sessions.length - 1].start ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <span className="text-xs" style={{ color: "var(--subtle)", alignSelf: "center" }}>退勤を素早く：</span>
+                {[
+                  { label: "定時", h: 8 },
+                  { label: "+1h", h: 9 },
+                  { label: "+2h", h: 10 },
+                  { label: "+3h", h: 11 },
+                  { label: "今", h: -1 },
+                ].map((q) => (
+                  <button
+                    key={q.label}
+                    type="button"
+                    className="chip"
+                    style={{ padding: "0.3rem 0.7rem", minHeight: "auto", fontSize: "0.78rem" }}
+                    onClick={() => {
+                      const lastIdx = f.sessions.length - 1;
+                      const last = f.sessions[lastIdx];
+                      if (q.h < 0) {
+                        // 今の時刻
+                        const now = new Date();
+                        const hh = String(now.getHours()).padStart(2, "0");
+                        const mm = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, "0");
+                        set({ sessions: f.sessions.map((x, j) => (j === lastIdx ? { ...x, end: `${hh}:${mm}` } : x)) });
+                        return;
+                      }
+                      const startMin = hhmmToMin(last.start);
+                      const brkMin = hhmmToMin(f.breakTime || "01:00") ?? 60;
+                      if (startMin == null) return;
+                      const endMin = startMin + q.h * 60 + brkMin;
+                      const hh = String(Math.floor(endMin / 60)).padStart(2, "0");
+                      const mm = String(endMin % 60).padStart(2, "0");
+                      set({ sessions: f.sessions.map((x, j) => (j === lastIdx ? { ...x, end: `${hh}:${mm}` } : x)) });
+                    }}
+                  >
+                    {q.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
           </div>
 
           {/* 休憩 */}
           <div>
-            <label className="label">休憩時間</label>
+            <label className="label">☕ 休憩時間</label>
             <div className="flex items-center gap-2">
               <div style={{ maxWidth: 140 }}>
                 <TimeInput value={f.breakTime} onChange={(v) => set({ breakTime: v })} placeholder="01:00" />
@@ -596,8 +670,8 @@ function Fields({
           ) : null}
 
           <div>
-            <label className="label">業務内容</label>
-            <textarea className="field" rows={3} value={f.content} onChange={(e) => set({ content: e.target.value })} placeholder="本日行った作業・対応内容" />
+            <label className="label">📝 業務内容</label>
+            <textarea className="field" rows={4} value={f.content} onChange={(e) => set({ content: e.target.value })} placeholder="本日行った作業・対応内容" />
           </div>
         </>
       ) : (
@@ -605,7 +679,7 @@ function Fields({
       )}
 
       <div>
-        <label className="label">備考</label>
+        <label className="label">🗒 備考</label>
         <textarea className="field" rows={2} value={f.remarks} onChange={(e) => set({ remarks: e.target.value })} placeholder="特記事項など" />
       </div>
     </div>

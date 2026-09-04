@@ -2,9 +2,8 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/actions";
 import { getSettlement } from "@/lib/projects-actions";
 import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
-import { countsAsWork, parseNum, hm } from "@/lib/constants";
+import { countsAsWork, parseNum, hm, monthWorkLevel } from "@/lib/constants";
 import AuthRetry from "@/components/AuthRetry";
-import WorkBalanceCard from "@/components/WorkBalanceCard";
 import AccountMenu from "@/components/AccountMenu";
 import { isAuthClockError } from "@/lib/auth-error";
 
@@ -61,6 +60,32 @@ export default async function HomePage() {
     maxRun = Math.max(maxRun, run);
     prev = cur;
   });
+
+  // 連続記入ストリーク（今日または昨日から遡って何日連続で日報を書いているか）
+  const enteredSet = new Set(daily.map((d) => d.date));
+  let streak = 0;
+  {
+    const cur = new Date(now);
+    cur.setHours(0, 0, 0, 0);
+    // 今日が未記入なら昨日から起算
+    if (!enteredSet.has(ymd(cur))) cur.setDate(cur.getDate() - 1);
+    while (enteredSet.has(ymd(cur))) {
+      streak += 1;
+      cur.setDate(cur.getDate() - 1);
+    }
+  }
+
+  // 直近7日間の実働時間（勤務日のみ、休みは0）
+  const weekBars: { date: string; label: string; hours: number; isToday: boolean }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(now);
+    dt.setDate(dt.getDate() - i);
+    dt.setHours(0, 0, 0, 0);
+    const ds = ymd(dt);
+    const rec = daily.find((r) => r.date === ds);
+    const hours = rec ? (Number(rec.work_hours) || 0) + (parseFloat(rec.return_office_hours || "0") || 0) : 0;
+    weekBars.push({ date: ds, label: ["日","月","火","水","木","金","土"][dt.getDay()], hours, isToday: ds === ymd(now) });
+  }
 
   const overtime = settlement?.overtime ?? 0;
 
@@ -169,8 +194,63 @@ export default async function HomePage() {
               </div>
             ) : null}
 
-            {/* 今月のワークバランス */}
-            <div className="mt-3"><WorkBalanceCard overtime={overtime} maxRun={maxRun} /></div>
+            {/* 今週の勤務時間ミニチャート */}
+            <div className="mt-3 card">
+              <div className="mb-2 flex items-baseline justify-between">
+                <div className="text-sm font-bold">今週の勤務時間</div>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>
+                  計 {weekBars.reduce((s, w) => s + w.hours, 0).toFixed(1)}h
+                </div>
+              </div>
+              <div className="flex items-end gap-1.5" style={{ height: 68 }}>
+                {weekBars.map((w) => {
+                  const max = Math.max(8, ...weekBars.map((x) => x.hours));
+                  const h = Math.max(3, Math.round((w.hours / max) * 56));
+                  const c = w.hours === 0 ? "#334155" : w.hours > 10 ? "#f59e0b" : w.hours > 9 ? "#60a5fa" : "#10b981";
+                  return (
+                    <div key={w.date} className="flex flex-1 flex-col items-center gap-1">
+                      <div
+                        style={{
+                          height: h, width: "100%",
+                          background: `linear-gradient(180deg, ${c}, ${c}88)`,
+                          borderRadius: "5px 5px 2px 2px",
+                          border: w.isToday ? "1.5px solid var(--accent)" : "none",
+                          boxShadow: w.isToday ? "0 0 8px rgba(59,130,246,0.6)" : "none",
+                        }}
+                      />
+                      <span className="text-[10px]" style={{ color: w.isToday ? "var(--accent)" : "var(--subtle)", fontWeight: w.isToday ? 700 : 400 }}>{w.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* ストリーク & ワークバランス（2列） */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="card" style={{
+                background: streak >= 5 ? "linear-gradient(135deg, rgba(245,158,11,0.20), rgba(239,68,68,0.10))" : undefined,
+                borderColor: streak >= 5 ? "#f59e0b" : undefined,
+              }}>
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>連続記入</div>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-2xl font-extrabold" style={{ color: streak >= 5 ? "#f59e0b" : "var(--text)" }}>{streak}</span>
+                  <span className="text-xs" style={{ color: "var(--muted)" }}>日連続</span>
+                  {streak >= 5 ? <span className="ml-auto text-lg">🔥</span> : streak >= 3 ? <span className="ml-auto text-lg">✨</span> : null}
+                </div>
+              </div>
+              <div className="card">
+                <div className="text-xs" style={{ color: "var(--subtle)" }}>今月のバランス</div>
+                {(() => {
+                  const lv = monthWorkLevel(overtime, maxRun);
+                  return (
+                    <div className="mt-1 flex items-center gap-2">
+                      <span className="text-2xl">{lv.emoji}</span>
+                      <span className="text-base font-bold" style={{ color: lv.color }}>{lv.label}</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
 
             {/* メトリクス */}
             <h2 className="mt-5 mb-2 text-xs font-bold" style={{ color: "var(--subtle)" }}>今月のサマリー</h2>
