@@ -5,10 +5,9 @@ import { createClient } from "./supabase/server";
 import {
   DailyReport,
   WorkSession,
-  WORK_TYPES,
-  LATE_EARLY_TYPES,
   sessionsHours,
   countsAsWork,
+  hasLateEarly,
   hhmmToMin,
 } from "./constants";
 
@@ -79,7 +78,7 @@ function buildRow(input: DailyInput, userId: string) {
     ? Math.max(0, Math.round((sessionsHours(validSessions) - breakH) * 60) / 60)
     : 0;
   const lateEarly =
-    LATE_EARLY_TYPES.has(input.attendance_type) && input.late_early_time
+    hasLateEarly(input.attendance_type) && input.late_early_time
       ? String(parseFloat(input.late_early_time) || 0)
       : "0";
   const returnOffice =
@@ -111,7 +110,7 @@ function buildRow(input: DailyInput, userId: string) {
 
 function validate(input: DailyInput): string | null {
   if (!input.date) return "日付を入力してください。";
-  if (WORK_TYPES.has(input.attendance_type)) {
+  if (countsAsWork(input.attendance_type)) {
     if (!input.company) return "会社名を選択してください。";
     const valid = (input.sessions || []).filter((s) => s.start && s.end);
     if (valid.length === 0) return "出勤・退勤の時刻を入力してください。";
