@@ -15,6 +15,7 @@ export type DailyReport = {
   work_sessions: string; // 複数勤務セッションの JSON: [{start,end}]
   work_content: string;
   remarks: string;
+  no_leave_consume?: string | null; // "1" = 半休で有給を消化しない
   created_at: string;
 };
 
@@ -214,9 +215,26 @@ export const LEAVE_CONSUME: Record<string, number> = {
   午後半休: 0.5,
 };
 
+/** いずれかが半休か */
+export function hasHalfLeave(att: string): boolean {
+  return parseAttendance(att).some((a) => HALF_WORK_TYPES.has(a));
+}
+
 /** 勤怠区分文字列（複数対応）から消化日数を計算 */
 export function leaveConsumedOf(att: string): number {
   return parseAttendance(att).reduce((s, a) => s + (LEAVE_CONSUME[a] ?? 0), 0);
+}
+
+/** 日報レコードから実際の消化日数を計算（no_leave_consume=1 の場合は半休分は 0） */
+export function leaveConsumedForReport(d: { attendance_type: string; no_leave_consume?: string | null }): number {
+  const skip = d.no_leave_consume === "1";
+  const attArr = parseAttendance(d.attendance_type);
+  return attArr.reduce((s, a) => {
+    const base = LEAVE_CONSUME[a] ?? 0;
+    // 「有給を使わない」チェック時、半休のみ 0 にする（フル有給は消化のまま）
+    if (skip && HALF_WORK_TYPES.has(a)) return s;
+    return s + base;
+  }, 0);
 }
 
 export const ATT_COLOR: Record<string, string> = {

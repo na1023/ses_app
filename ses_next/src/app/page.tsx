@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getCurrentUser } from "@/lib/actions";
 import { getSettlement } from "@/lib/projects-actions";
 import { listAllDaily, listGrants, listInterviews } from "@/lib/domain-actions";
-import { countsAsWork, parseNum, hm, monthWorkLevel, leaveConsumedOf } from "@/lib/constants";
+import { countsAsWork, parseNum, hm, monthWorkLevel, leaveConsumedForReport } from "@/lib/constants";
 import AuthRetry from "@/components/AuthRetry";
 import AccountMenu from "@/components/AccountMenu";
 import { isAuthClockError } from "@/lib/auth-error";
@@ -118,7 +118,7 @@ export default async function HomePage() {
       if (toExp <= 60) soon.push(`${exp.toISOString().slice(0, 10)}（あと${toExp}日）`);
     }
   });
-  const consumed = daily.reduce((s, d) => s + leaveConsumedOf(d.attendance_type), 0);
+  const consumed = daily.reduce((s, d) => s + leaveConsumedForReport(d), 0);
   const leaveRemain = grantedValid - consumed;
 
   const waitingIv = interviews.filter((i) => i.status === "結果待ち");

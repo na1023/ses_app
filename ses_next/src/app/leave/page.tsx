@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/actions";
 import { listGrants, listAllDaily, LeaveGrant } from "@/lib/domain-actions";
-import { DailyReport, parseNum, leaveConsumedOf } from "@/lib/constants";
+import { DailyReport, parseNum, leaveConsumedForReport } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import LeaveClient from "./LeaveClient";
 
@@ -36,7 +36,7 @@ export default async function LeavePage() {
     }
   });
 
-  const consumed = daily.reduce((s, d) => s + leaveConsumedOf(d.attendance_type), 0);
+  const consumed = daily.reduce((s, d) => s + leaveConsumedForReport(d), 0);
   const remaining = grantedValid - consumed;
 
   return (

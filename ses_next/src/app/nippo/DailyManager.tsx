@@ -69,6 +69,7 @@ type FormState = {
   returnEnd: string;
   content: string;
   remarks: string;
+  noLeaveConsume: boolean;
 };
 
 function emptyForm(): FormState {
@@ -85,6 +86,7 @@ function emptyForm(): FormState {
     returnEnd: "20:00",
     content: "",
     remarks: "",
+    noLeaveConsume: false,
   };
 }
 
@@ -104,6 +106,7 @@ function fromReport(r: DailyReport): FormState {
     returnEnd: r.return_office_end || "20:00",
     content: r.work_content || "",
     remarks: r.remarks || "",
+    noLeaveConsume: r.no_leave_consume === "1",
   };
 }
 
@@ -226,6 +229,7 @@ export default function DailyManager({
       return_office_end: f.isReturn ? f.returnEnd : "",
       work_content: f.content,
       remarks: f.remarks,
+      no_leave_consume: f.noLeaveConsume ? "1" : "0",
     };
   }
 
@@ -416,6 +420,9 @@ export default function DailyManager({
                           const c = ATT_COLOR[a] ?? "#94a3b8";
                           return <span key={a} className="badge" style={{ background: c + "22", color: c }}>{a}</span>;
                         })}
+                        {r.no_leave_consume === "1" && attList.some((a: string) => a === "午前半休" || a === "午後半休") ? (
+                          <span className="badge" style={{ background: "#334155", color: "#94a3b8" }}>無給</span>
+                        ) : null}
                         {dayTotal > 0 ? (
                           <span className="badge" style={{ background: lv.color + "22", color: lv.color }}>{lv.emoji} {lv.label}</span>
                         ) : null}
@@ -471,6 +478,7 @@ function Fields({
   const needsTime = countsAsWork(f.att);
   const isLate = hasLateEarly(f.att);
   const attArr = parseAttendance(f.att);
+  const isHalfLeave = attArr.some((a) => a === "午前半休" || a === "午後半休");
   const set = (patch: Partial<FormState>) => setF((p) => ({ ...p, ...patch }));
 
   const active = projects.filter((p) => activeOn(p, f.date));
@@ -521,6 +529,17 @@ function Fields({
         </div>
         {attArr.length === 0 ? (
           <p className="mt-1 text-xs" style={{ color: "#fbbf24" }}>⚠ 少なくとも1つ選択してください</p>
+        ) : null}
+        {isHalfLeave ? (
+          <label className="mt-2 flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
+            <input
+              type="checkbox"
+              className="h-5 w-5"
+              checked={f.noLeaveConsume}
+              onChange={(e) => set({ noLeaveConsume: e.target.checked })}
+            />
+            <span>この半休は<b>有給を使わない</b>（欠勤・遅刻扱いなど、無給の半休）</span>
+          </label>
         ) : null}
       </div>
 

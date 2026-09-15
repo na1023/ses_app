@@ -67,6 +67,7 @@ export type DailyInput = {
   return_office_end: string;
   work_content: string;
   remarks: string;
+  no_leave_consume?: string; // "1" = 半休で有給を消化しない
 };
 
 function buildRow(input: DailyInput, userId: string) {
@@ -104,6 +105,7 @@ function buildRow(input: DailyInput, userId: string) {
     return_office_end: needsTime && input.return_office_hours && parseFloat(input.return_office_hours) > 0 ? (input.return_office_end || "") : "",
     work_content: needsTime ? input.work_content.trim() : "",
     remarks: input.remarks.trim(),
+    no_leave_consume: input.no_leave_consume === "1" ? "1" : "0",
     _wh: wh,
   };
 }
