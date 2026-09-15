@@ -207,6 +207,18 @@ export function hasLateEarly(att: string): boolean {
   return parseAttendance(att).some((a) => LATE_EARLY_TYPES.has(a));
 }
 
+/** 各勤怠区分ごとの有給消化日数 */
+export const LEAVE_CONSUME: Record<string, number> = {
+  有給: 1,
+  午前半休: 0.5,
+  午後半休: 0.5,
+};
+
+/** 勤怠区分文字列（複数対応）から消化日数を計算 */
+export function leaveConsumedOf(att: string): number {
+  return parseAttendance(att).reduce((s, a) => s + (LEAVE_CONSUME[a] ?? 0), 0);
+}
+
 export const ATT_COLOR: Record<string, string> = {
   出社: "#3b82f6",
   在宅: "#6366f1",

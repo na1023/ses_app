@@ -2,7 +2,7 @@ import { getCurrentUser } from "@/lib/actions";
 import { listAllDaily } from "@/lib/domain-actions";
 import { getSettings } from "@/lib/settings-actions";
 import { periodOf, inPeriod } from "@/lib/period";
-import { DailyReport, countsAsWork, ATT_COLOR, parseNum } from "@/lib/constants";
+import { DailyReport, countsAsWork, ATT_COLOR, parseNum, parseAttendance } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import MonthNav from "../settlement/MonthNav";
 
@@ -38,9 +38,11 @@ export default async function ReportPage({ searchParams }: { searchParams: { ym?
   const workDays = new Set(workRows.map((d) => d.date)).size;
   const avg = workDays ? total / workDays : 0;
 
-  // 勤怠区分別
+  // 勤怠区分別（複数選択はそれぞれ 1 件としてカウント）
   const attMap = new Map<string, number>();
-  month.forEach((d) => attMap.set(d.attendance_type, (attMap.get(d.attendance_type) ?? 0) + 1));
+  month.forEach((d) => {
+    parseAttendance(d.attendance_type).forEach((a) => attMap.set(a, (attMap.get(a) ?? 0) + 1));
+  });
   const attList = Array.from(attMap.entries()).sort((a, b) => b[1] - a[1]);
 
   // 案件別稼働

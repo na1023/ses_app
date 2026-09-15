@@ -1,12 +1,10 @@
 import { getCurrentUser } from "@/lib/actions";
 import { listGrants, listAllDaily, LeaveGrant } from "@/lib/domain-actions";
-import { DailyReport, parseNum } from "@/lib/constants";
+import { DailyReport, parseNum, leaveConsumedOf } from "@/lib/constants";
 import AppHeader from "@/components/AppHeader";
 import LeaveClient from "./LeaveClient";
 
 export const dynamic = "force-dynamic";
-
-const CONSUME: Record<string, number> = { 有給: 1, 午前半休: 0.5, 午後半休: 0.5 };
 
 export default async function LeavePage() {
   const user = await getCurrentUser();
@@ -38,7 +36,7 @@ export default async function LeavePage() {
     }
   });
 
-  const consumed = daily.reduce((s, d) => s + (CONSUME[d.attendance_type] ?? 0), 0);
+  const consumed = daily.reduce((s, d) => s + leaveConsumedOf(d.attendance_type), 0);
   const remaining = grantedValid - consumed;
 
   return (
